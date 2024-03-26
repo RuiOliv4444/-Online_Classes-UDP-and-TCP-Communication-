@@ -1,1 +1,4 @@
+Mariana;m123;professor
+Pedro;p123;aluno
+Joao;ola123;administrador
 Rui;uni123;administrador
