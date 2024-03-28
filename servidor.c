@@ -29,17 +29,17 @@ typedef us_list * lista;
 
 lista cria(void);
 void erro(char *msg);
-void process_client(int client_fd, struct sockaddr_in client_addr);
+void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_utilizadores);
 void login_user(const char *username, const char *password, int *login, lista lista_utilizadores);
 void udp_server_function(lista lista_utilizadores);
-void tcp_server_function (int tcp_fd);
+void tcp_server_function (int tcp_fd, lista lista_utilizadores);
 void list_classes(int client_fd);
 void list_subscribed(int client_fd);
 void create_class(int client_fd);
 void send_cont(int client_fd);
 int add_user(const char *name, const char *pass, const char *ro, lista lista_utilizadores);
 void insere_utilizador(lista lista_utilizadores, struct utilizador person);
-void remove_utilizador(lista *lista_utilizadores, char username[TAM]);
+int remove_utilizador(lista *lista_utilizadores, char username[TAM],struct sockaddr_in client_addr, socklen_t addrlen);
 void ler_ficheiro(lista lista_utilizadores);
 void escrever_ficheiro(lista lista_utilizadores);
 void listar_users(lista lista_utilizadores,int udp_fd,struct sockaddr_in client_addr, socklen_t addrlen);
@@ -51,6 +51,7 @@ int main(int argc, char *argv[]) {
     	printf("news_server {PORTO_CLIENT} {PORTO_ADMIN} {ficheiro texto}\n"); //FEJFNEQJFNEQJDNQJQNF
     	exit(-1);
   	}
+
 
     int tcp_fd;
     struct sockaddr_in addr;
@@ -70,7 +71,7 @@ int main(int argc, char *argv[]) {
 
     if (listen(tcp_fd, 5) < 0)
         erro("Erro no listen");
-	
+
 	filename = malloc(strlen(argv[3]) + 1);
     strcpy(filename, argv[3]);
 
@@ -83,7 +84,7 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-	tcp_server_function(tcp_fd);
+	tcp_server_function(tcp_fd,lista_utilizadores);
     return 0;
 }
 
@@ -91,7 +92,7 @@ int main(int argc, char *argv[]) {
 //-------------------------DIVISÓRIA DAS FUNÇÔES PERTENCENTES A TCP COMEÇA AQUI----------------------------------
 
 
-void tcp_server_function (int tcp_fd){
+void tcp_server_function (int tcp_fd, lista lista_utilizadores){
 	int client;
 	struct sockaddr_in client_addr;
 	socklen_t client_addr_size;
@@ -101,7 +102,7 @@ void tcp_server_function (int tcp_fd){
         if (client > 0) {
             if (fork() == 0) {
                 close(tcp_fd);
-                process_client(client, client_addr);
+                process_client(client, client_addr,lista_utilizadores);
                 exit(0);
             }
             close(client);
@@ -109,12 +110,8 @@ void tcp_server_function (int tcp_fd){
     }
 }
 
-void process_client(int client_fd, struct sockaddr_in client_addr) {
+void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_utilizadores) {
     char buffer[BUF_SIZE];
-
-	lista lista_utilizadores = cria(); // Acho que vamos tere de abrir e fechar o ficheiro de texto a cada iteração para estarmos sempre com a versao mis atualizada do programa,
-									//pois pode acontecer de quando estamos a corre-lo, o admin pode adicionar, ou outra coisa, algum aluno na base de dados, mas por enquanto vou deixar assim
-	ler_ficheiro(lista_utilizadores);
 
     char request[] = "Para aceder à sua conta, faça o login\n"; //mensagem de aviso para fazer o login
     write(client_fd, request, strlen(request));
@@ -200,103 +197,78 @@ void send_cont(int client_fd) {
 //-------------------------DIVISÓRIA DAS FUNÇÔES PERTENCENTES A UDP COMEÇA AQUI----------------------------------
 
 
+
+
 void udp_server_function(lista lista_utilizadores) {
     int udp_fd;
     struct sockaddr_in udp_addr, client_addr;
     socklen_t addrlen = sizeof(client_addr);
-    char buf[BUF_SIZE];
-    char comando[TAM];
-    char arg1[TAM], arg2[TAM], arg3[TAM];
+    char buf[BUF_SIZE], comando[TAM],arg1[TAM], arg2[TAM], arg3[TAM];
     int admin_logado = 0;
 
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (udp_fd < 0) {
+    if (udp_fd < 0)
         erro("Erro ao criar socket UDP");
-        return; // Importante retornar após erro para evitar execução adicional
-    }
 
     memset(&udp_addr, 0, sizeof(udp_addr));
-    udp_addr.sin_family = AF_INET;
-    udp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
     udp_addr.sin_port = htons(PORTO_CONFIG);
 
-    if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0) {
+    if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0)
         erro("Erro no bind do socket UDP");
-        close(udp_fd); // Fechar o socket antes de sair
-        return;
-    }
+		memset(buf, 0, BUF_SIZE); 
+        while (1) {
 
-    while (1) {
-        memset(buf, 0, BUF_SIZE); 
-        if (recvfrom(udp_fd, buf, BUF_SIZE, 0, (struct sockaddr*)&client_addr, &addrlen) < 0) {
-            erro("Erro ao receber dados UDP");
-            continue; // Continuar para a próxima iteração em caso de erro
-        }
+			if (recvfrom(udp_fd, buf, BUF_SIZE, 0, (struct sockaddr*)&client_addr, &addrlen) < 0){
+				erro("Erro ao receber dados UDP");
+			}				
 
-        if (sscanf(buf, "%s %s %s %s", comando, arg1, arg2, arg3) < 2) {
-            printf("Sem argumentos suficientes\n");
-            continue; // Continuar para a próxima iteração se os argumentos não forem suficientes
-        }
+			if (sscanf(buf, "%s %s %s %s", comando, arg1, arg2, arg3) < 1) {
+   				sendto(udp_fd, "Digita um comando!\n", strlen("Digita um comando!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+				continue;
+			}
+			
+			if (strcmp(comando, "LOGIN") == 0) {
 
-        if (strcmp(comando, "LOGIN") == 0) {
-            int login_status;
-            login_user(arg1,arg2,&login_status, lista_utilizadores);
-            if(login_status > 0) {
-                admin_logado = login_status;
-                sendto(udp_fd, "Login efetuado com sucesso!\n", strlen("Login efetuado com sucesso!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-            }
-            else {
-                sendto(udp_fd, "Dados de acesso inválidos!\n", strlen("Dados de acesso inválidos!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-            }
-        } 
+				login_user(arg1,arg2,&admin_logado, lista_utilizadores);
 
-        // Verificar se o usuário está autenticado como administrador
-        if (!admin_logado) {
-            const char *msg = "Por favor, faça login primeiro\n";
-            sendto(udp_fd, msg, strlen(msg), 0, (struct sockaddr*)&client_addr, addrlen);
-            continue;
-        }
-        
-        // Processar outros comandos
-        if (strcmp(comando, "ADD_USER") == 0) {
-            if(strlen(arg1) > 0 && strlen(arg2) > 0 && strlen(arg3) > 0) {
-                if(add_user(arg1, arg2, arg3, lista_utilizadores)) {
-                    sendto(udp_fd,  "Utilizador adicionado com sucesso.\n", strlen( "Utilizador adicionado com sucesso.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-                } else {
-                    sendto(udp_fd, "Cargo não existente.\n", strlen("Cargo não existente.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-                }
-            }
-            else {
-                sendto(udp_fd, "Argumentos inválidos.\n", strlen("Argumentos inválidos.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-            }
-        } 
-        else if (strcmp(comando, "DEL") == 0) {
-            if(strlen(arg1) > 0) {
-                remove_utilizador(&lista_utilizadores, arg1);
-            }
-            else {
-                sendto(udp_fd, "Argumentos inválidos.\n", strlen("Argumentos inválidos.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-            }
-        } 
-        else if (strcmp(comando, "LIST") == 0) {
-            listar_users(lista_utilizadores, udp_fd, client_addr, addrlen);
-        } 
-        else if (strcmp(comando, "QUIT_SERVER") == 0) {
-            sendto(udp_fd, "Adeus.\n", strlen("Adeus.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-            // Encerra o servidor.
-            escrever_ficheiro(lista_utilizadores);
-            close(udp_fd);
-            free(filename);
-            exit(0);
-        }
-        else {
-            sendto(udp_fd, "Comando desconhecido\n", strlen("Comando desconhecido\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-        }
-        memset(buf, 0, BUF_SIZE); // Prepara para a próxima mensagem.
+				if(admin_logado == 1){//mensagem de ter conseguido logar
+					sendto(udp_fd, "Login efetuado com sucesso!\n", strlen("Login efetuado com sucesso!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+				}
+				else{//mensagem de não ter conseguido logar
+					sendto(udp_fd, "Dados de acesso inválidos!\n", strlen("Dados de acesso inválidos!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+				}
+			} else if (admin_logado == 1) {								// O admin para ter acesso a esta parte vai ter de se logar primeiro, portanto a primeira mensagem dele terá de ser o login e só depois
+																	//realizar uma das operações abaixo
+				if (strcmp(comando, "ADD_USER") == 0) {
+					if(add_user(arg1, arg2, arg3,lista_utilizadores)){
+						sendto(udp_fd, "Utilizador adicionado com sucesso.\n", strlen("Utilizador adicionado com sucesso.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
+					} else {
+						sendto(udp_fd, "Cargo nao existente.\n", strlen("Cargo nao existente.\n"), 0,(struct sockaddr*)&client_addr, addrlen);
+					}
+					// Implemente a lógica para adicionar um usuário.
+				} else if (strcmp(comando, "DEL") == 0) {
+					// Implemente a lógica para remover um usuário.
+					if(remove_utilizador(&lista_utilizadores, arg1,client_addr, addrlen)){
+						sendto(udp_fd, "Utilizador eliminado com sucesso.\n", strlen("Utilizador adicionado com sucesso.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
+					} else {
+						sendto(udp_fd, "Utilizador não encontrado.\n", strlen("Cargo nao existente.\n"), 0,(struct sockaddr*)&client_addr, addrlen);
+					}
+				} else if (strcmp(comando, "LIST") == 0) {
+					// Implemente a lógica para listar os usuários.
+					listar_users(lista_utilizadores, udp_fd, client_addr, addrlen);
+				} else if (strcmp(comando, "QUIT_SERVER") == 0) {
+					// Encerra o servidor.
+					escrever_ficheiro(lista_utilizadores);
+					close(udp_fd);
+					exit(0);
+				}
+			} else {
+				sendto(udp_fd, "Inicia sessão primeiramente!\n", strlen("Inicia sessão primeiramente!\n"), 0,(struct sockaddr*)&client_addr, addrlen);// Responde que é necessário fazer login primeiro.
+			}
+			memset(buf, 0, BUF_SIZE);
     }
 }
-
-
 
 void login_user(const char *username, const char *password, int *login, lista lista_utilizadores) {//verifica se a pessoa que está a dar login está a por os dados corretos e
     *login = 0;
@@ -356,15 +328,15 @@ lista cria (){  //Funcao que cria uma lista com 1 elemento e retorna essa mesma 
     return aux;
 }
 
-void insere_utilizador(lista lista_utilizadores, struct utilizador person) {					//inserir um novo utilizador na lista(aluno,prof ou admin)
+void insere_utilizador(lista lista_utilizadores, struct utilizador person) {//inserir um novo utilizador na lista(aluno,prof ou admin)
     lista no = (lista) malloc(sizeof(us_list)); // aloca espaço para um novo nó
     no->user = person; // armazena a struct utilizador no campo 'u' do novo nó
     no->next = lista_utilizadores->next; // define o próximo ponteiro do novo nó para o primeiro nó da lista 
     lista_utilizadores->next = no; // define o próximo ponteiro do nó anterior para o novo nó, adicionando-o na lista
 }
 
-void remove_utilizador(lista *lista_utilizadores, char username[TAM]) {							//elimina um utilizador, caso esse realmente exista na lista
-    lista aux = *lista_utilizadores;
+int remove_utilizador(lista *lista_utilizadores, char username[TAM],struct sockaddr_in client_addr, socklen_t addrlen) {							//elimina um utilizador, caso esse realmente exista na lista
+	lista aux = *lista_utilizadores;
    
     lista ant = aux;
     aux = aux->next;
@@ -375,15 +347,14 @@ void remove_utilizador(lista *lista_utilizadores, char username[TAM]) {							//
             ant->next = aux->next;
             free(aux);
             count++;
-            return;
+            return 1;
         }
         ant = aux;
         aux = aux->next;
     }
     if (count == 0){
-        printf("Elemento não encontrado\n");  //EFNAKFNEFJNEWFJEWNFJEWF
+        return 0;
     }
-
 }
 
 void listar_users(lista lista_utilizadores,int udp_fd,struct sockaddr_in client_addr, socklen_t addrlen){ //mostrar os utilizadores todos
@@ -406,7 +377,7 @@ void listar_users(lista lista_utilizadores,int udp_fd,struct sockaddr_in client_
 
 
 void ler_ficheiro(lista lista_utilizadores) {
-    file = fopen(filename, "r");
+    FILE *file = fopen(filename, "r");
     if (file == NULL) {
         erro("Erro ao abrir o ficheiro.");
     }
@@ -421,7 +392,7 @@ void ler_ficheiro(lista lista_utilizadores) {
 
 
 void escrever_ficheiro(lista lista_utilizadores) {
-    file = fopen(filename, "w");
+    FILE *file = fopen(filename, "w");
     if (file == NULL) {
         erro("Erro ao abrir o ficheiro para escrita.");
     }
