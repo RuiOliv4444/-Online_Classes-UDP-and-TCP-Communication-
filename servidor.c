@@ -200,100 +200,103 @@ void send_cont(int client_fd) {
 //-------------------------DIVISÓRIA DAS FUNÇÔES PERTENCENTES A UDP COMEÇA AQUI----------------------------------
 
 
-
-
 void udp_server_function(lista lista_utilizadores) {
     int udp_fd;
     struct sockaddr_in udp_addr, client_addr;
     socklen_t addrlen = sizeof(client_addr);
     char buf[BUF_SIZE];
+    char comando[TAM];
+    char arg1[TAM], arg2[TAM], arg3[TAM];
+    int admin_logado = 0;
 
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (udp_fd < 0)
+    if (udp_fd < 0) {
         erro("Erro ao criar socket UDP");
+        return; // Importante retornar após erro para evitar execução adicional
+    }
 
     memset(&udp_addr, 0, sizeof(udp_addr));
-
+    udp_addr.sin_family = AF_INET;
+    udp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     udp_addr.sin_port = htons(PORTO_CONFIG);
 
-    if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0)
+    if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0) {
         erro("Erro no bind do socket UDP");
+        close(udp_fd); // Fechar o socket antes de sair
+        return;
+    }
 
-	int admin_logado = 0;
+    while (1) {
+        memset(buf, 0, BUF_SIZE); 
+        if (recvfrom(udp_fd, buf, BUF_SIZE, 0, (struct sockaddr*)&client_addr, &addrlen) < 0) {
+            erro("Erro ao receber dados UDP");
+            continue; // Continuar para a próxima iteração em caso de erro
+        }
 
-	while (1) {
-		char comando[TAM];
-		char arg1[TAM], arg2[TAM], arg3[TAM];
+        if (sscanf(buf, "%s %s %s %s", comando, arg1, arg2, arg3) < 2) {
+            printf("Sem argumentos suficientes\n");
+            continue; // Continuar para a próxima iteração se os argumentos não forem suficientes
+        }
 
-		memset(buf, 0, BUF_SIZE); 
-		if (recvfrom(udp_fd, buf, BUF_SIZE, 0, (struct sockaddr*)&client_addr, &addrlen) < 0){
-			erro("Erro ao receber dados UDP");
-			continue;											// ter a certeza 
-		}
-		if (strlen(buf) == 0) {									// Nenhum dado foi recebido, passar à frente, evitamos que envia a mensagem de pedir para iniciar sessão
-			continue;
-		}
-		if (sscanf(buf, "%s %s %s %s", comando, arg1, arg2, arg3) >= 1) {
-			printf("Command: %s, Arg1: %s, Arg2: %s\n", comando, arg1, arg2);
-		}
-		
-		if (strcmp(comando, "LOGIN") == 0) {
-			login_user(arg1,arg2,&admin_logado, lista_utilizadores);
+        if (strcmp(comando, "LOGIN") == 0) {
+            int login_status;
+            login_user(arg1,arg2,&login_status, lista_utilizadores);
+            if(login_status > 0) {
+                admin_logado = login_status;
+                sendto(udp_fd, "Login efetuado com sucesso!\n", strlen("Login efetuado com sucesso!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+            }
+            else {
+                sendto(udp_fd, "Dados de acesso inválidos!\n", strlen("Dados de acesso inválidos!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+            }
+        } 
 
-			if(admin_logado == 1){//mensagem de ter conseguido logar
-				sendto(udp_fd, "Login efetuado com sucesso!\n", strlen("Login efetuado com sucesso!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-			}
-			else{//mensagem de não ter conseguido logar
-				printf("Mensagem que está em cada string: %s // %s // %s",comando, arg1, arg2 );
-				sendto(udp_fd, "Dados de acesso inválidos!\n", strlen("Dados de acesso inválidos!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-
-			}
-		} 
-		else if (admin_logado == 1) {								// O admin para ter acesso a esta parte vai ter de se logar primeiro, portanto a primeira mensagem dele terá de ser o login e só depois											//realizar uma das operações abaixo
-			if (strcmp(comando, "ADD_USER") == 0) {
-				if(strlen(arg1)>0 && strlen(arg2)>0 && strlen(arg3)>0) {
-					if(add_user(arg1, arg2, arg3,lista_utilizadores)){
-						sendto(udp_fd,  "Utilizador adicionado com sucesso.\n", strlen( "Utilizador adicionado com sucesso.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-
-					} else {
-						sendto(udp_fd, "Cargo nao existente.\n", strlen("Cargo nao existente.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-
-					}
-				}
-				else{
-					sendto(udp_fd, "Argumentos invalidos.\n", strlen("Argumentos invalidos.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-
-				}
-				// Implemente a lógica para adicionar um usuário.
-			} 
-			else if (strcmp(comando, "DEL") == 0) {
-				if(strlen(arg1)>0) {
-					remove_utilizador(&lista_utilizadores, arg1);
-				}
-				else{
-					sendto(udp_fd, "Argumentos invalidos.\n", strlen("Argumentos invalidos.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-
-				}
-			} 
-			else if (strcmp(comando, "LIST") == 0) {
-				listar_users(lista_utilizadores, udp_fd, client_addr, addrlen);
-
-			} 
-			else if (strcmp(comando, "QUIT_SERVER") == 0) {
-				sendto(udp_fd, "Argumentos invalidos.\n", strlen("Argumentos invalidos.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-				// Encerra o servidor.
-				escrever_ficheiro(lista_utilizadores);
-				close(udp_fd);
-				free(filename);
-				exit(0);
-			}
-			else{
-				sendto(udp_fd, "Comando desconhecido\n", strlen("Comando desconhecido\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-			}
-		} 
-		memset(buf, 0, BUF_SIZE); // Prepara para a próxima mensagem.
+        // Verificar se o usuário está autenticado como administrador
+        if (!admin_logado) {
+            const char *msg = "Por favor, faça login primeiro\n";
+            sendto(udp_fd, msg, strlen(msg), 0, (struct sockaddr*)&client_addr, addrlen);
+            continue;
+        }
+        
+        // Processar outros comandos
+        if (strcmp(comando, "ADD_USER") == 0) {
+            if(strlen(arg1) > 0 && strlen(arg2) > 0 && strlen(arg3) > 0) {
+                if(add_user(arg1, arg2, arg3, lista_utilizadores)) {
+                    sendto(udp_fd,  "Utilizador adicionado com sucesso.\n", strlen( "Utilizador adicionado com sucesso.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+                } else {
+                    sendto(udp_fd, "Cargo não existente.\n", strlen("Cargo não existente.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+                }
+            }
+            else {
+                sendto(udp_fd, "Argumentos inválidos.\n", strlen("Argumentos inválidos.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+            }
+        } 
+        else if (strcmp(comando, "DEL") == 0) {
+            if(strlen(arg1) > 0) {
+                remove_utilizador(&lista_utilizadores, arg1);
+            }
+            else {
+                sendto(udp_fd, "Argumentos inválidos.\n", strlen("Argumentos inválidos.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+            }
+        } 
+        else if (strcmp(comando, "LIST") == 0) {
+            listar_users(lista_utilizadores, udp_fd, client_addr, addrlen);
+        } 
+        else if (strcmp(comando, "QUIT_SERVER") == 0) {
+            sendto(udp_fd, "Argumentos inválidos.\n", strlen("Argumentos inválidos.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+            // Encerra o servidor.
+            escrever_ficheiro(lista_utilizadores);
+            close(udp_fd);
+            free(filename);
+            exit(0);
+        }
+        else {
+            sendto(udp_fd, "Comando desconhecido\n", strlen("Comando desconhecido\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+        }
+        memset(buf, 0, BUF_SIZE); // Prepara para a próxima mensagem.
     }
 }
+
+
 
 void login_user(const char *username, const char *password, int *login, lista lista_utilizadores) {//verifica se a pessoa que está a dar login está a por os dados corretos e
     *login = 0;
