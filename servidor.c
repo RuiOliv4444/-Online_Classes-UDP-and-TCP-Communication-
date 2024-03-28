@@ -282,7 +282,7 @@ void udp_server_function(lista lista_utilizadores) {
             listar_users(lista_utilizadores, udp_fd, client_addr, addrlen);
         } 
         else if (strcmp(comando, "QUIT_SERVER") == 0) {
-            sendto(udp_fd, "Argumentos inválidos.\n", strlen("Argumentos inválidos.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+            sendto(udp_fd, "Adeus.\n", strlen("Adeus.\n"), 0, (struct sockaddr*) &client_addr, addrlen);
             // Encerra o servidor.
             escrever_ficheiro(lista_utilizadores);
             close(udp_fd);
