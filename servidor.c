@@ -35,6 +35,7 @@ void udp_server_function(lista lista_utilizadores);
 void tcp_server_function (int tcp_fd, lista lista_utilizadores);
 void list_classes(int client_fd);
 void list_subscribed(int client_fd);
+void susbcribe_class(int client_fd);
 void create_class(int client_fd);
 void send_cont(int client_fd);
 int add_user(const char *name, const char *pass, const char *ro, lista lista_utilizadores);
@@ -48,10 +49,9 @@ int verifica_func(const char aux[TAM]);
 
 int main(int argc, char *argv[]) {
 	if (argc != 4) {
-    	printf("news_server {PORTO_CLIENT} {PORTO_ADMIN} {ficheiro texto}\n"); //FEJFNEQJFNEQJDNQJQNF
+    	printf("news_server {PORTO_CLIENT} {PORTO_ADMIN} {ficheiro texto}\n"); 
     	exit(-1);
   	}
-
 
     int tcp_fd;
     struct sockaddr_in addr;
@@ -75,9 +75,9 @@ int main(int argc, char *argv[]) {
 	filename = malloc(strlen(argv[3]) + 1);
     strcpy(filename, argv[3]);
 
-	lista lista_utilizadores = cria(); // Acho que vamos tere de abrir e fechar o ficheiro de texto a cada iteração para estarmos sempre com a versao mis atualizada do programa,
-									//pois pode acontecer de quando estamos a corre-lo, o admin pode adicionar, ou outra coisa, algum aluno na base de dados, mas por enquanto vou deixar assim
+	lista lista_utilizadores = cria(); 
 	ler_ficheiro(lista_utilizadores);
+
     if (fork() == 0) { // Cria um processo filho para o servidor UDP
         udp_server_function(lista_utilizadores);
         exit(0);
@@ -133,25 +133,25 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 			login_user(arg1,arg2,&client_logado, lista_utilizadores);
 
 			if(client_logado > 1){//mensagem de ter conseguido logar
-				strcpy(mensagem_boa, "Login efetuado com sucesso!\n");
+				strcpy(mensagem_boa, "OK!\n");
 				if (write(client_fd, mensagem_boa, strlen(mensagem_boa)) < 0) erro("Erro ao enviar resposta TCP");
 				memset(mensagem_boa, 0, sizeof(mensagem_boa));
 			}
 			else{//mensagem de não ter conseguido logar
-				strcpy(mensagem_ma, "Dados de acesso inválidos!\n");
+				strcpy(mensagem_ma, "REJECTED!\n");
 				if (write(client_fd, mensagem_ma, strlen(mensagem_ma)) < 0) erro("Erro ao enviar resposta TCP");
 				memset(mensagem_ma, 0, sizeof(mensagem_ma));
 			}
 		} else if (client_logado > 1) {								// O admin para ter acesso a esta parte vai ter de se logar primeiro, portanto a primeira mensagem dele terá de ser o login e só depois
 																	//realizar uma das operações abaixo
 			if (strcmp(comando, "LIST_CLASSES") == 0) {
-				// Implementar a lógica para ver as classes, vou por apenas funçoes teste, porque nao sei trabalhar com multicast ainda
 				list_classes(client_fd);
+
 			} else if (strcmp(comando, "LIST_SUBSCRIBED") == 0) {
-				// Implementar a lógica para ver as classes do user, vou por apenas funçoes teste, porque nao sei trabalhar com multicast ainda
 				list_subscribed(client_fd);
+				
 			} else if (strcmp(comando, "SUSBCRIBE_CLASS") == 0) {
-				// Implementar a lógica para subscrever uma aula, vou por apenas funçoes teste, porque nao sei trabalhar com multicast ainda
+				susbcribe_class(client_fd);
 
 			} else if (strcmp(comando, "DISCONNECT") == 0) {
 				escrever_ficheiro(lista_utilizadores);
@@ -160,10 +160,9 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 			}
 		}else if(client_logado == 3){
 			if (strcmp(comando, "CREATE_CLASS") == 0) {
-				// Implementar a lógica para ver criar uma turma, vou por apenas funçoes teste, porque nao sei trabalhar com multicast ainda
 				create_class(client_fd);
+
 			} else if (strcmp(comando, "SEND") == 0) {
-				// Implementar a lógica para listar as turmas, vou por apenas funçoes teste, porque nao sei trabalhar com multicast ainda
 				send_cont(client_fd);
 			}		
 		}else {
@@ -184,6 +183,11 @@ void list_subscribed(int client_fd) {
     write(client_fd, message, strlen(message));
 }
 
+void susbcribe_class(int client_fd){
+	char message[] = "Esta é uma função protótipo para subscrever uma classe.\n";
+    write(client_fd, message, strlen(message));
+}
+
 void create_class(int client_fd) {
     char message[] = "Esta é uma função protótipo para criar uma aula.\n";
     write(client_fd, message, strlen(message));
@@ -193,11 +197,9 @@ void send_cont(int client_fd) {
     char message[] = "Esta é uma função protótipo para enviar conteúdo para uma aula.\n";
     write(client_fd, message, strlen(message));
 }
+
+
 //-------------------------DIVISÓRIA DAS FUNÇÔES PERTENCENTES A UDP COMEÇA AQUI----------------------------------
-
-
-
-
 void udp_server_function(lista lista_utilizadores) {
     int udp_fd;
     struct sockaddr_in udp_addr, client_addr;
@@ -250,24 +252,27 @@ void udp_server_function(lista lista_utilizadores) {
 					} else {
 						sendto(udp_fd, "Cargo nao existente.\n", strlen("Cargo nao existente.\n"), 0,(struct sockaddr*)&client_addr, addrlen);
 					}
-					// Implemente a lógica para adicionar um usuário.
+					
 				} else if (strcmp(comando, "DEL") == 0) {
-					// Implemente a lógica para remover um usuário.
 					if(remove_utilizador(&lista_utilizadores, arg1,client_addr, addrlen)){
 						sendto(udp_fd, "Utilizador eliminado com sucesso.\n", strlen("Utilizador adicionado com sucesso.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
 					} else {
-						sendto(udp_fd, "Utilizador não encontrado.\n", strlen("Cargo nao existente.\n"), 0,(struct sockaddr*)&client_addr, addrlen);
+						sendto(udp_fd, "Utilizador não encontrado.\n", strlen("Utilizador não encontrado.\n"), 0,(struct sockaddr*)&client_addr, addrlen);
 					}
 				} else if (strcmp(comando, "LIST") == 0) {
-					// Implemente a lógica para listar os usuários.
 					listar_users(lista_utilizadores, udp_fd, client_addr, addrlen);
+
 				} else if (strcmp(comando, "QUIT_SERVER") == 0) {
-					// Encerra o servidor.
 					escrever_ficheiro(lista_utilizadores);
 					close(udp_fd);
 					printf("Servidor UDP encerrando...\n");
+					free(filename);
 					fflush(stdout);
 					break;
+	
+				}
+				else{
+					sendto(udp_fd, "Comando desconhecido.\n", strlen("Comando desconhecido.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
 				}
 			} else {
 					sendto(udp_fd, "Inicia sessão primeiramente!\n", strlen("Inicia sessão primeiramente!\n"), 0,(struct sockaddr*)&client_addr, addrlen);// Responde que é necessário fazer login primeiro.
@@ -327,7 +332,6 @@ int verifica_func(const char aux[TAM]){																// verifica se estamos a 
 }
 //------------------------- FUNÇÕES RESPONSAVEIS PELO TRATAMENTO DA LISTA DE UTILIZADORES ----------------------------------
 
-
 lista cria (){  //Funcao que cria uma lista com 1 elemento e retorna essa mesma lista
     lista aux;
     struct utilizador p = {"", "", ""};
@@ -347,7 +351,7 @@ void insere_utilizador(lista lista_utilizadores, struct utilizador person) {//in
 }
 
 int remove_utilizador(lista *lista_utilizadores, char username[TAM],struct sockaddr_in client_addr, socklen_t addrlen) {							//elimina um utilizador, caso esse realmente exista na lista
-	lista aux = *lista_utilizadores;
+		lista aux = *lista_utilizadores;
    
     lista ant = aux;
     aux = aux->next;
@@ -380,8 +384,7 @@ void listar_users(lista lista_utilizadores,int udp_fd,struct sockaddr_in client_
 }
 
 
-//------------------------- FUNÇÕES RESPONSAVEIS PELO TRATAMENTO DO FICHERIO DE TEXTO ----------------------------------
-
+//------------------------- FUNÇÕES RESPONSAVEIS PELO TRATAMENTO DO FICHEIRO DE TEXTO ----------------------------------
 
 void ler_ficheiro(lista lista_utilizadores) {
     FILE *file = fopen(filename, "r");
