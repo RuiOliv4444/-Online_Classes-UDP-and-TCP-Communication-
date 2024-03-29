@@ -351,21 +351,17 @@ int remove_utilizador(lista *lista_utilizadores, char username[TAM],struct socka
    
     lista ant = aux;
     aux = aux->next;
-    int count = 0;
 
     while (aux != NULL) {
         if (strcmp(aux->user.username, username) == 0) {
             ant->next = aux->next;
             free(aux);
-            count++;
             return 1;
         }
         ant = aux;
         aux = aux->next;
     }
-    if (count == 0){
-        return 0;
-    }
+    return 0;
 }
 
 void listar_users(lista lista_utilizadores,int udp_fd,struct sockaddr_in client_addr, socklen_t addrlen){ //mostrar os utilizadores todos
