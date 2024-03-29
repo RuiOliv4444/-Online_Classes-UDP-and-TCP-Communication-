@@ -75,13 +75,16 @@ int main(int argc, char *argv[]) {
     if (listen(tcp_fd, 5) < 0)
         erro("Erro no listen");
 
-
 	lista lista_utilizadores = cria(); 
 	ler_ficheiro(lista_utilizadores);
 
+	udp_server_function(udp_port,lista_utilizadores);
     if (fork() == 0) { // Cria um processo filho para o servidor UDP
-        udp_server_function(udp_port,lista_utilizadores);
-        exit(0);
+		udp_server_function(udp_port,lista_utilizadores); 
+		exit(0);
+	}
+	else {
+        waitpid(-1, NULL, 0); 
     }
 
 	tcp_server_function(tcp_fd,lista_utilizadores);
@@ -272,7 +275,6 @@ void udp_server_function(unsigned short udp_port,lista lista_utilizadores) {
 					free(filename);
 					fflush(stdout);
 					break;
-	
 				}
 				else{
 					sendto(udp_fd, "Comando desconhecido.\n", strlen("Comando desconhecido.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
