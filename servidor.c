@@ -78,7 +78,6 @@ int main(int argc, char *argv[]) {
 	lista lista_utilizadores = cria(); 
 	ler_ficheiro(lista_utilizadores);
 
-	udp_server_function(udp_port,lista_utilizadores);
     if (fork() == 0) { // Cria um processo filho para o servidor UDP
 		udp_server_function(udp_port,lista_utilizadores); 
 		exit(0);
