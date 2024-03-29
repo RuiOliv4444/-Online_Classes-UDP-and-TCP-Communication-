@@ -33,7 +33,7 @@ void udp_server_function(unsigned short udp_port,lista lista_utilizadores);
 void tcp_server_function (int tcp_fd, lista lista_utilizadores);
 void list_classes(int client_fd);
 void list_subscribed(int client_fd);
-void susbcribe_class(int client_fd);
+void subscribe_class(int client_fd);
 void create_class(int client_fd);
 void send_cont(int client_fd);
 int add_user(const char *name, const char *pass, const char *ro, lista lista_utilizadores);
@@ -120,8 +120,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
         bzero(buffer, BUF_SIZE);
 		char comando[TAM];
 		char arg1[TAM], arg2[TAM];
-		char mensagem_boa[BUF_SIZE];
-		char mensagem_ma[BUF_SIZE];
+		
         if (read(client_fd, buffer, BUF_SIZE-1) <= 0){
 			erro("Erro ao receber dados TCP");
 			continue;	
@@ -134,14 +133,10 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 			login_user(arg1,arg2,&client_logado, lista_utilizadores);
 
 			if(client_logado > 1){//mensagem de ter conseguido logar
-				strcpy(mensagem_boa, "OK!\n");
-				if (write(client_fd, mensagem_boa, strlen(mensagem_boa)) < 0) erro("Erro ao enviar resposta TCP");
-				memset(mensagem_boa, 0, sizeof(mensagem_boa));
+				write(client_fd, "OK!\n", strlen("OK!\n"));
 			}
 			else{//mensagem de não ter conseguido logar
-				strcpy(mensagem_ma, "REJECTED!\n");
-				if (write(client_fd, mensagem_ma, strlen(mensagem_ma)) < 0) erro("Erro ao enviar resposta TCP");
-				memset(mensagem_ma, 0, sizeof(mensagem_ma));
+				write(client_fd, "REJECTED!\n", strlen("REJECTED!\n"));
 			}
 		} else if (client_logado > 1) {								// O admin para ter acesso a esta parte vai ter de se logar primeiro, portanto a primeira mensagem dele terá de ser o login e só depois
 																	//realizar uma das operações abaixo
@@ -152,12 +147,15 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 				list_subscribed(client_fd);
 				
 			} else if (strcmp(comando, "SUSBCRIBE_CLASS") == 0) {
-				susbcribe_class(client_fd);
+				subscribe_class(client_fd);
 
 			} else if (strcmp(comando, "DISCONNECT") == 0) {
 				escrever_ficheiro(lista_utilizadores);
 				close(client_fd);
 				exit(0);
+			}
+			else{
+				write(client_fd, "Comando desconhecido!\n", strlen("Comando desconhecido!\n"));
 			}
 		}else if(client_logado == 3){
 			if (strcmp(comando, "CREATE_CLASS") == 0) {
@@ -175,21 +173,25 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 }
 
 void list_classes(int client_fd) {
+
     char message[] = "Esta é uma função protótipo para listar as classes.\n";
     write(client_fd, message, strlen(message));
 }
 
 void list_subscribed(int client_fd) {
+
     char message[] = "Esta é uma função protótipo para listar as classes em que participas.\n";
     write(client_fd, message, strlen(message));
 }
 
-void susbcribe_class(int client_fd){
+void subscribe_class(int client_fd){
+
 	char message[] = "Esta é uma função protótipo para subscrever uma classe.\n";
     write(client_fd, message, strlen(message));
 }
 
 void create_class(int client_fd) {
+
     char message[] = "Esta é uma função protótipo para criar uma aula.\n";
     write(client_fd, message, strlen(message));
 }
