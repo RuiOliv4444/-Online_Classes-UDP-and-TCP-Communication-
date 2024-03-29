@@ -6,8 +6,6 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-#define PORTO_TURMAS 12345 // Porta TCP
-#define PORTO_CONFIG 12348 // Porta UDP
 #define BUF_SIZE 512
 #define TAM 30 
 
@@ -31,7 +29,7 @@ lista cria(void);
 void erro(char *msg);
 void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_utilizadores);
 void login_user(const char *username, const char *password, int *login, lista lista_utilizadores);
-void udp_server_function(lista lista_utilizadores);
+void udp_server_function(unsigned short udp_port,lista lista_utilizadores);
 void tcp_server_function (int tcp_fd, lista lista_utilizadores);
 void list_classes(int client_fd);
 void list_subscribed(int client_fd);
@@ -53,6 +51,11 @@ int main(int argc, char *argv[]) {
     	exit(-1);
   	}
 
+	unsigned short tcp_port = htons(atoi(argv[1]));
+    unsigned short udp_port = htons(atoi(argv[2]));
+	filename = malloc(strlen(argv[3]) + 1);
+    strcpy(filename, argv[3]);
+
     int tcp_fd;
     struct sockaddr_in addr;
     socklen_t client_addr_size;
@@ -64,7 +67,7 @@ int main(int argc, char *argv[]) {
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port = htons(PORTO_TURMAS);
+    addr.sin_port = tcp_port;
 
     if (bind(tcp_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
         erro("Erro no bind do socket TCP");
@@ -72,14 +75,12 @@ int main(int argc, char *argv[]) {
     if (listen(tcp_fd, 5) < 0)
         erro("Erro no listen");
 
-	filename = malloc(strlen(argv[3]) + 1);
-    strcpy(filename, argv[3]);
 
 	lista lista_utilizadores = cria(); 
 	ler_ficheiro(lista_utilizadores);
 
     if (fork() == 0) { // Cria um processo filho para o servidor UDP
-        udp_server_function(lista_utilizadores);
+        udp_server_function(udp_port,lista_utilizadores);
         exit(0);
     }
 
@@ -200,7 +201,7 @@ void send_cont(int client_fd) {
 
 
 //-------------------------DIVISÓRIA DAS FUNÇÔES PERTENCENTES A UDP COMEÇA AQUI----------------------------------
-void udp_server_function(lista lista_utilizadores) {
+void udp_server_function(unsigned short udp_port,lista lista_utilizadores) {
     int udp_fd;
     struct sockaddr_in udp_addr, client_addr;
     socklen_t addrlen = sizeof(client_addr);
@@ -213,7 +214,7 @@ void udp_server_function(lista lista_utilizadores) {
 
     memset(&udp_addr, 0, sizeof(udp_addr));
 
-    udp_addr.sin_port = htons(PORTO_CONFIG);
+    udp_addr.sin_port = udp_port;
 
     if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0)
         erro("Erro no bind do socket UDP");
