@@ -45,6 +45,7 @@ void listar_users(lista lista_utilizadores,int udp_fd,struct sockaddr_in client_
 int verifica_func(const char aux[TAM]);
 
 
+
 int main(int argc, char *argv[]) {
 	if (argc != 4) {
     	printf("news_server {PORTO_CLIENT} {PORTO_ADMIN} {ficheiro texto}\n"); 
@@ -113,6 +114,11 @@ void tcp_server_function (int tcp_fd, lista lista_utilizadores){
 }
 
 void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_utilizadores) {
+	const char* menu_cliente = "Lista de comandos para Clientes:\n""> LIST_CLASSES\n""> LIST_SUBSCRIBED\n""> SUBSCRIBE_CLASS <username>\n";
+
+    // Envia o menu logo após a conexão do cliente
+    send(client_fd, menu_cliente, strlen(menu_cliente), 0);
+
     char buffer[BUF_SIZE];
 
     char request[] = "Para aceder à sua conta, faça o login\n"; //mensagem de aviso para fazer o login
@@ -222,6 +228,9 @@ void udp_server_function(unsigned short udp_port,lista lista_utilizadores) {
 
     if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0)
         erro("Erro no bind do socket UDP");
+
+	const char* menu_admin = "Lista de comandos para ADMIN:\n""> ADD_USER <username> <password> <role>\n""> DEL <username>\n""> LIST\n""> QUIT_SERVER\n";
+	sendto(udp_fd, menu_admin, strlen(menu_admin), 0, (struct sockaddr*)&client_addr, addrlen);
 
     while (1) {
 		memset(buf, '\0', sizeof(buf));
