@@ -395,8 +395,6 @@ void ler_ficheiro(lista lista_utilizadores) {
     }
     struct utilizador person;
     while (fscanf(file, "%[^;];%[^;];%[^;\n]\n", person.username, person.password, person.role) == 3) {
-    	printf("%s %s %s\n", person.username, person.password, person.role);
-		fflush(stdout);
     	insere_utilizador(lista_utilizadores, person);
 	}	
     fclose(file);
