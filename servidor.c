@@ -45,7 +45,6 @@ void listar_users(lista lista_utilizadores,int udp_fd,struct sockaddr_in client_
 int verifica_func(const char aux[TAM]);
 
 
-
 int main(int argc, char *argv[]) {
 	if (argc != 4) {
     	printf("news_server {PORTO_CLIENT} {PORTO_ADMIN} {ficheiro texto}\n"); 
@@ -76,15 +75,13 @@ int main(int argc, char *argv[]) {
     if (listen(tcp_fd, 5) < 0)
         erro("Erro no listen");
 
+
 	lista lista_utilizadores = cria(); 
 	ler_ficheiro(lista_utilizadores);
 
     if (fork() == 0) { // Cria um processo filho para o servidor UDP
-		udp_server_function(udp_port,lista_utilizadores); 
-		exit(0);
-	}
-	else {
-        waitpid(-1, NULL, 0); 
+        udp_server_function(udp_port,lista_utilizadores);
+        exit(0);
     }
 
 	tcp_server_function(tcp_fd,lista_utilizadores);
@@ -114,11 +111,6 @@ void tcp_server_function (int tcp_fd, lista lista_utilizadores){
 }
 
 void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_utilizadores) {
-	const char* menu_cliente = "Lista de comandos para Clientes:\n""> LIST_CLASSES\n""> LIST_SUBSCRIBED\n""> SUBSCRIBE_CLASS <username>\n";
-
-    // Envia o menu logo após a conexão do cliente
-    write(client_fd, menu_cliente, strlen(menu_cliente));
-
     char buffer[BUF_SIZE];
 
     char request[] = "Para aceder à sua conta, faça o login\n"; //mensagem de aviso para fazer o login
@@ -128,7 +120,8 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
         bzero(buffer, BUF_SIZE);
 		char comando[TAM];
 		char arg1[TAM], arg2[TAM];
-		
+		char mensagem_boa[BUF_SIZE];
+		char mensagem_ma[BUF_SIZE];
         if (read(client_fd, buffer, BUF_SIZE-1) <= 0){
 			erro("Erro ao receber dados TCP");
 			continue;	
@@ -141,10 +134,14 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 			login_user(arg1,arg2,&client_logado, lista_utilizadores);
 
 			if(client_logado > 1){//mensagem de ter conseguido logar
-				write(client_fd, "OK!\n", strlen("OK!\n"));
+				strcpy(mensagem_boa, "OK!\n");
+				if (write(client_fd, mensagem_boa, strlen(mensagem_boa)) < 0) erro("Erro ao enviar resposta TCP");
+				memset(mensagem_boa, 0, sizeof(mensagem_boa));
 			}
 			else{//mensagem de não ter conseguido logar
-				write(client_fd, "REJECTED!\n", strlen("REJECTED!\n"));
+				strcpy(mensagem_ma, "REJECTED!\n");
+				if (write(client_fd, mensagem_ma, strlen(mensagem_ma)) < 0) erro("Erro ao enviar resposta TCP");
+				memset(mensagem_ma, 0, sizeof(mensagem_ma));
 			}
 		} else if (client_logado > 1) {								// O admin para ter acesso a esta parte vai ter de se logar primeiro, portanto a primeira mensagem dele terá de ser o login e só depois
 																	//realizar uma das operações abaixo
@@ -162,9 +159,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 				close(client_fd);
 				exit(0);
 			}
-			else{
-				write(client_fd, "Comando desconhecido!\n", strlen("Comando desconhecido!\n"));
-			}
+			
 		}else if(client_logado == 3){
 			if (strcmp(comando, "CREATE_CLASS") == 0) {
 				create_class(client_fd);
@@ -205,6 +200,7 @@ void create_class(int client_fd) {
 }
 
 void send_cont(int client_fd) {
+
     char message[] = "Esta é uma função protótipo para enviar conteúdo para uma aula.\n";
     write(client_fd, message, strlen(message));
 }
@@ -228,9 +224,6 @@ void udp_server_function(unsigned short udp_port,lista lista_utilizadores) {
 
     if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0)
         erro("Erro no bind do socket UDP");
-
-	const char* menu_admin = "Lista de comandos para ADMIN:\n""> ADD_USER <username> <password> <role>\n""> DEL <username>\n""> LIST\n""> QUIT_SERVER\n";
-	sendto(udp_fd, menu_admin, strlen(menu_admin), 0, (struct sockaddr*)&client_addr, addrlen);
 
     while (1) {
 		memset(buf, '\0', sizeof(buf));
@@ -283,6 +276,7 @@ void udp_server_function(unsigned short udp_port,lista lista_utilizadores) {
 					free(filename);
 					fflush(stdout);
 					break;
+	
 				}
 				else{
 					sendto(udp_fd, "Comando desconhecido.\n", strlen("Comando desconhecido.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
