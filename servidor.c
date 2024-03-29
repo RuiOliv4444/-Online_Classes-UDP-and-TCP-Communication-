@@ -117,7 +117,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 	const char* menu_cliente = "Lista de comandos para Clientes:\n""> LIST_CLASSES\n""> LIST_SUBSCRIBED\n""> SUBSCRIBE_CLASS <username>\n";
 
     // Envia o menu logo após a conexão do cliente
-    send(client_fd, menu_cliente, strlen(menu_cliente), 0);
+    write(client_fd, menu_cliente, strlen(menu_cliente));
 
     char buffer[BUF_SIZE];
 
