@@ -230,7 +230,6 @@ void udp_server_function(lista lista_utilizadores) {
 	    	continue;
 		}
 
-		printf("%s\n",buf);
 		sscanf(buf, "%s %s %s %s", comando, arg1, arg2, arg3);
 		if (strcmp(buf, "X") != 0 && strlen(buf) != 1) {
 			if (strcmp(comando, "LOGIN") == 0) {
