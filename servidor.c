@@ -78,7 +78,6 @@ int main(int argc, char *argv[]) {
 	lista lista_utilizadores = cria(); // Acho que vamos tere de abrir e fechar o ficheiro de texto a cada iteração para estarmos sempre com a versao mis atualizada do programa,
 									//pois pode acontecer de quando estamos a corre-lo, o admin pode adicionar, ou outra coisa, algum aluno na base de dados, mas por enquanto vou deixar assim
 	ler_ficheiro(lista_utilizadores);
-
     if (fork() == 0) { // Cria um processo filho para o servidor UDP
         udp_server_function(lista_utilizadores);
         exit(0);
@@ -203,8 +202,8 @@ void udp_server_function(lista lista_utilizadores) {
     int udp_fd;
     struct sockaddr_in udp_addr, client_addr;
     socklen_t addrlen = sizeof(client_addr);
-    char buf[BUF_SIZE], comando[TAM],arg1[TAM], arg2[TAM], arg3[TAM];
     int admin_logado = 0;
+	char buf[BUF_SIZE], comando[TAM],arg1[TAM], arg2[TAM], arg3[TAM];
 
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_fd < 0)
@@ -216,18 +215,24 @@ void udp_server_function(lista lista_utilizadores) {
 
     if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0)
         erro("Erro no bind do socket UDP");
-		memset(buf, 0, BUF_SIZE); 
-        while (1) {
 
-			if (recvfrom(udp_fd, buf, BUF_SIZE, 0, (struct sockaddr*)&client_addr, &addrlen) < 0){
-				erro("Erro ao receber dados UDP");
-			}				
+    while (1) {
+		memset(buf, '\0', sizeof(buf));
+		memset(comando, '\0', sizeof(comando));
+		memset(arg1, '\0', sizeof(arg1));
+		memset(arg2, '\0', sizeof(arg2));
+		memset(arg3, '\0', sizeof(arg3));
 
-			if (sscanf(buf, "%s %s %s %s", comando, arg1, arg2, arg3) < 1) {
-   				sendto(udp_fd, "Digita um comando!\n", strlen("Digita um comando!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
-				continue;
-			}
-			
+		int bytes_received = recvfrom(udp_fd, buf, BUF_SIZE, 0, (struct sockaddr*)&client_addr, &addrlen);
+
+		if (bytes_received < 0) {
+	    	erro("Erro ao receber dados UDP");
+	    	continue;
+		}
+
+		printf("%s\n",buf);
+		sscanf(buf, "%s %s %s %s", comando, arg1, arg2, arg3);
+		if (strcmp(buf, "X") != 0 && strlen(buf) != 1) {
 			if (strcmp(comando, "LOGIN") == 0) {
 
 				login_user(arg1,arg2,&admin_logado, lista_utilizadores);
@@ -261,13 +266,20 @@ void udp_server_function(lista lista_utilizadores) {
 					// Encerra o servidor.
 					escrever_ficheiro(lista_utilizadores);
 					close(udp_fd);
-					exit(0);
+					printf("Servidor UDP encerrando...\n");
+					fflush(stdout);
+					break;
 				}
 			} else {
-				sendto(udp_fd, "Inicia sessão primeiramente!\n", strlen("Inicia sessão primeiramente!\n"), 0,(struct sockaddr*)&client_addr, addrlen);// Responde que é necessário fazer login primeiro.
+					sendto(udp_fd, "Inicia sessão primeiramente!\n", strlen("Inicia sessão primeiramente!\n"), 0,(struct sockaddr*)&client_addr, addrlen);// Responde que é necessário fazer login primeiro.
 			}
-			memset(buf, 0, BUF_SIZE);
+		}else if(strcmp(buf, "X") != 0 ){
+			sendto(udp_fd, "Nenhum comando recebido!\n", strlen("Nenhum comando recebido!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+    		continue;
+		}else
+			continue;
     }
+	exit(0);
 }
 
 void login_user(const char *username, const char *password, int *login, lista lista_utilizadores) {//verifica se a pessoa que está a dar login está a por os dados corretos e
@@ -382,9 +394,9 @@ void ler_ficheiro(lista lista_utilizadores) {
         erro("Erro ao abrir o ficheiro.");
     }
     struct utilizador person;
-
     while (fscanf(file, "%[^;];%[^;];%[^;\n]\n", person.username, person.password, person.role) == 3) {
     	printf("%s %s %s\n", person.username, person.password, person.role);
+		fflush(stdout);
     	insere_utilizador(lista_utilizadores, person);
 	}	
     fclose(file);
@@ -399,7 +411,7 @@ void escrever_ficheiro(lista lista_utilizadores) {
 
     lista atual = lista_utilizadores->next; // Pula o cabeçalho da lista
     while (atual != NULL) {
-        fprintf(file, "%s %s %s\n", atual->user.username, atual->user.password, atual->user.role);
+        fprintf(file, "%s;%s;%s\n", atual->user.username, atual->user.password, atual->user.role);
         atual = atual->next;
     }
 
