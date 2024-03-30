@@ -2,15 +2,31 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <stdbool.h>
+#include <unistd.h>
+#include <stdio.h>
 #include <netinet/in.h>
 #include <unistd.h>
-#include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/socket.h>
+#include <sys/shm.h>
+#include <signal.h>
+#include <semaphore.h>
+#include <sys/ipc.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <time.h>
 
 #define BUF_SIZE 512
 #define TAM 30 
 
 FILE *file;
 char *filename;
+int tcp_fd, udp_fd;
 
 struct utilizador {
     char username[TAM];
@@ -27,7 +43,7 @@ typedef us_list * lista;
 
 lista cria(void);
 void erro(char *msg);
-void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_utilizadores);
+void process_client(int client_fd,struct sockaddr_in client_addr, lista lista_utilizadores);
 void login_user(const char *username, const char *password, int *login, lista lista_utilizadores);
 void udp_server_function(unsigned short udp_port,lista lista_utilizadores);
 void tcp_server_function (int tcp_fd, lista lista_utilizadores);
@@ -43,7 +59,7 @@ void ler_ficheiro(lista lista_utilizadores);
 void escrever_ficheiro(lista lista_utilizadores);
 void listar_users(lista lista_utilizadores,int udp_fd,struct sockaddr_in client_addr, socklen_t addrlen);
 int verifica_func(const char aux[TAM]);
-
+void treat_signal(int sig);
 
 int main(int argc, char *argv[]) {
 	if (argc != 4) {
@@ -56,35 +72,50 @@ int main(int argc, char *argv[]) {
 	filename = malloc(strlen(argv[3]) + 1);
     strcpy(filename, argv[3]);
 
-    int tcp_fd;
-    struct sockaddr_in addr;
-    socklen_t client_addr_size;
-
-    tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (tcp_fd < 0)
-        perror("Erro ao criar socket TCP");
-
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port = tcp_port;
-
-    if (bind(tcp_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
-        erro("Erro no bind do socket TCP");
-
-    if (listen(tcp_fd, 5) < 0)
-        erro("Erro no listen");
-
-
 	lista lista_utilizadores = cria(); 
 	ler_ficheiro(lista_utilizadores);
 
-    if (fork() == 0) { // Cria um processo filho para o servidor UDP
-        udp_server_function(udp_port,lista_utilizadores);
-        exit(0);
-    }
+	pid_t tcp = fork();
+    if (tcp == 0) { // Cria um processo filho para o servidor TCP
+		struct sockaddr_in tcp_addr;
+    	socklen_t client_addr_size;
 
-	tcp_server_function(tcp_fd,lista_utilizadores);
+		if (tcp_fd < 0)
+        	perror("Erro ao criar socket TCP");
+
+		memset(&tcp_addr, 0, sizeof(tcp_addr));
+		tcp_addr.sin_family = AF_INET;
+		tcp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		tcp_addr.sin_port = tcp_port;
+	    tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
+		
+
+		if (bind(tcp_fd, (struct sockaddr*)&tcp_addr, sizeof(tcp_addr)) < 0)
+			erro("Erro no bind do socket TCP");
+
+		// Comece a ouvir conexões
+		if (listen(tcp_fd, 5) < 0)
+			erro("Erro no listen");
+
+		int client;
+		client_addr_size = sizeof(tcp_addr);
+
+		signal(SIGTERM, treat_signal);
+
+		while (1) {
+			client = accept(tcp_fd, (struct sockaddr *)&tcp_addr, &client_addr_size);
+			if (client > 0) {
+				if (fork() == 0) {
+					close(tcp_fd);
+					process_client(client, tcp_addr,lista_utilizadores);
+					exit(0);
+				}
+				close(client);
+			}
+    	}
+	}
+	udp_server_function(udp_port, lista_utilizadores);
+
     return 0;
 }
 
@@ -92,36 +123,16 @@ int main(int argc, char *argv[]) {
 //-------------------------DIVISÓRIA DAS FUNÇÔES PERTENCENTES A TCP COMEÇA AQUI----------------------------------
 
 
-void tcp_server_function (int tcp_fd, lista lista_utilizadores){
-	int client;
-	struct sockaddr_in client_addr;
-	socklen_t client_addr_size;
-	client_addr_size = sizeof(client_addr);
-    while (1) {
-        client = accept(tcp_fd, (struct sockaddr *)&client_addr, &client_addr_size);
-        if (client > 0) {
-            if (fork() == 0) {
-                close(tcp_fd);
-                process_client(client, client_addr,lista_utilizadores);
-                exit(0);
-            }
-            close(client);
-        }
-    }
-}
-
 void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_utilizadores) {
     char buffer[BUF_SIZE];
 
-    char request[] = "Para aceder à sua conta, faça o login\n"; //mensagem de aviso para fazer o login
+    char request[] = "LOGIN {username} {password}\n"; //mensagem de aviso para fazer o login
     write(client_fd, request, strlen(request));
 	int client_logado = 0;
     while (1) { //ficamos sempre a ler as mensagens do utilizador e a lidar com elas, até a mensagem recebida ser "SAIR"
         bzero(buffer, BUF_SIZE);
 		char comando[TAM];
 		char arg1[TAM], arg2[TAM];
-		char mensagem_boa[BUF_SIZE];
-		char mensagem_ma[BUF_SIZE];
         if (read(client_fd, buffer, BUF_SIZE-1) <= 0){
 			erro("Erro ao receber dados TCP");
 			continue;	
@@ -134,14 +145,10 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 			login_user(arg1,arg2,&client_logado, lista_utilizadores);
 
 			if(client_logado > 1){//mensagem de ter conseguido logar
-				strcpy(mensagem_boa, "OK!\n");
-				if (write(client_fd, mensagem_boa, strlen(mensagem_boa)) < 0) erro("Erro ao enviar resposta TCP");
-				memset(mensagem_boa, 0, sizeof(mensagem_boa));
+				if (write(client_fd,  "OK!\n", strlen( "OK!\n")) < 0) erro("Erro ao enviar resposta TCP");
 			}
 			else{//mensagem de não ter conseguido logar
-				strcpy(mensagem_ma, "REJECTED!\n");
-				if (write(client_fd, mensagem_ma, strlen(mensagem_ma)) < 0) erro("Erro ao enviar resposta TCP");
-				memset(mensagem_ma, 0, sizeof(mensagem_ma));
+				if (write(client_fd, "REJECTED!\n", strlen("REJECTED!\n")) < 0) erro("Erro ao enviar resposta TCP");
 			}
 		} else if (client_logado > 1) {								// O admin para ter acesso a esta parte vai ter de se logar primeiro, portanto a primeira mensagem dele terá de ser o login e só depois
 																	//realizar uma das operações abaixo
@@ -157,7 +164,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 			} else if (strcmp(comando, "DISCONNECT") == 0) {
 				escrever_ficheiro(lista_utilizadores);
 				close(client_fd);
-				exit(0);
+				break;
 			}
 			
 		}else if(client_logado == 3){
@@ -172,7 +179,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 		}
 		memset(buffer, 0, BUF_SIZE); // Prepara para a próxima mensagem.
 	}
-    close(client_fd);// no fim fechamos sempre o socket e o ficheiro
+    exit(0);
 }
 
 void list_classes(int client_fd) {
@@ -208,22 +215,31 @@ void send_cont(int client_fd) {
 
 //-------------------------DIVISÓRIA DAS FUNÇÔES PERTENCENTES A UDP COMEÇA AQUI----------------------------------
 void udp_server_function(unsigned short udp_port,lista lista_utilizadores) {
-    int udp_fd;
     struct sockaddr_in udp_addr, client_addr;
     socklen_t addrlen = sizeof(client_addr);
-    int admin_logado = 0;
-	char buf[BUF_SIZE], comando[TAM],arg1[TAM], arg2[TAM], arg3[TAM];
+    char buf[BUF_SIZE], comando[TAM],arg1[TAM], arg2[TAM], arg3[TAM];
 
+    // Cria um socket UDP
     udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (udp_fd < 0)
+    if (udp_fd < 0) {
         erro("Erro ao criar socket UDP");
+        exit(EXIT_FAILURE);
+    }
 
+    // Configura o endereço do servidor
     memset(&udp_addr, 0, sizeof(udp_addr));
-
+    udp_addr.sin_family = AF_INET;
     udp_addr.sin_port = udp_port;
+    udp_addr.sin_addr.s_addr = htonl(INADDR_ANY); // Aceita conexões em qualquer interface de rede
 
-    if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0)
+    // Vincula (bind) o socket ao endereço/porta
+    if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0) {
         erro("Erro no bind do socket UDP");
+        close(udp_fd);
+        exit(EXIT_FAILURE);
+    }
+
+	int admin_logado = 0;
 
     while (1) {
 		memset(buf, '\0', sizeof(buf));
@@ -271,11 +287,12 @@ void udp_server_function(unsigned short udp_port,lista lista_utilizadores) {
 
 				} else if (strcmp(comando, "QUIT_SERVER") == 0) {
 					escrever_ficheiro(lista_utilizadores);
-					close(udp_fd);
 					printf("Servidor UDP encerrando...\n");
-					free(filename);
 					fflush(stdout);
-					break;
+					free(filename);
+					kill(tcp_fd, SIGTERM);
+                    waitpid(tcp_fd, NULL, 0); // Espera o filho terminar
+                    break;
 	
 				}
 				else{
@@ -290,7 +307,8 @@ void udp_server_function(unsigned short udp_port,lista lista_utilizadores) {
 		}else
 			continue;
     }
-	exit(0);
+	close(udp_fd);
+	return;
 }
 
 void login_user(const char *username, const char *password, int *login, lista lista_utilizadores) {//verifica se a pessoa que está a dar login está a por os dados corretos e
@@ -421,6 +439,12 @@ void escrever_ficheiro(lista lista_utilizadores) {
     fclose(file);
 }
 
+void treat_signal(int sig){
+    close(tcp_fd);
+    while (wait(NULL)> 0);
+    printf("A fechar servidor TCP\n");
+    exit(0);
+}
 
 void erro(char *msg) {
     perror(msg);
