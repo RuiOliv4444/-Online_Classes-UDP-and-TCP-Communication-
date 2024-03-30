@@ -16,8 +16,8 @@ int main(int argc, char *argv[]) {
 	lista lista_utilizadores = cria(); 
 	ler_ficheiro(lista_utilizadores);
 
-	pid_t tcp = fork();
-    if (tcp == 0) { // Cria um processo filho para o servidor TCP
+	p_tcp = fork();
+    if (p_tcp == 0) { // Cria um processo filho para o servidor TCP
 		struct sockaddr_in tcp_addr;
     	socklen_t client_addr_size;
 
@@ -34,7 +34,6 @@ int main(int argc, char *argv[]) {
 		if (bind(tcp_fd, (struct sockaddr*)&tcp_addr, sizeof(tcp_addr)) < 0)
 			erro("Erro no bind do socket TCP");
 
-		// Comece a ouvir conexões
 		if (listen(tcp_fd, 5) < 0)
 			erro("Erro no listen");
 
@@ -49,11 +48,12 @@ int main(int argc, char *argv[]) {
 				if (fork() == 0) {
 					close(tcp_fd);
 					process_client(client, tcp_addr,lista_utilizadores);
+					close(client);
 					exit(0);
 				}
-				close(client);
 			}
     	}
+		close(tcp_fd);
 	}
 	udp_server_function(udp_port, lista_utilizadores);
 
@@ -75,8 +75,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr, lista lista_u
 		char comando[TAM];
 		char arg1[TAM], arg2[TAM];
         if (read(client_fd, buffer, BUF_SIZE-1) <= 0){
-			erro("Erro ao receber dados TCP");
-			continue;	
+			break;
 		}
         buffer[strcspn(buffer, "\n")] = 0; // Remove a mudança de linha "\n"
 
@@ -251,9 +250,8 @@ void udp_server_function(unsigned short udp_port,lista lista_utilizadores) {
 					escrever_ficheiro(lista_utilizadores);
 					printf("Servidor UDP encerrando...\n");
 					fflush(stdout);
-					free(filename);
-					kill(tcp_fd, SIGTERM);
-                    waitpid(tcp_fd, NULL, 0); // Espera o filho terminar
+					kill(p_tcp, SIGTERM);
+                    waitpid(p_tcp, NULL, 0); // Espera o filho terminar
                     break;
 	
 				}
@@ -270,7 +268,6 @@ void udp_server_function(unsigned short udp_port,lista lista_utilizadores) {
 			continue;
     }
 	close(udp_fd);
-	return;
 }
 
 void login_user(const char *username, const char *password, int *login, lista lista_utilizadores) {//verifica se a pessoa que está a dar login está a por os dados corretos e
@@ -402,9 +399,12 @@ void escrever_ficheiro(lista lista_utilizadores) {
 }
 
 void treat_signal(int sig){
-    close(tcp_fd);
-    while (wait(NULL)> 0);
-    printf("A fechar servidor TCP\n");
+     if (p_tcp != 0) {
+        kill(p_tcp, SIGTERM);
+        waitpid(p_tcp, NULL, 0);
+    }
+
+    printf("Servidor encerrado.\n");
     exit(0);
 }
 
