@@ -24,6 +24,7 @@
 FILE *file;
 char *filename;
 int tcp_fd, udp_fd;
+pid_t p_tcp;
 
 struct utilizador {
     char username[TAM];
