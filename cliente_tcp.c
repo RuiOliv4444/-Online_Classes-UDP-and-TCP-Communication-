@@ -47,10 +47,10 @@ int main(int argc, char *argv[]) {
     fgets(mensagem, 1024, stdin);  //guardar na variavel "mensagem" a mensagem do cliente
 
     mensagem[strcspn(mensagem, "\n")] = 0; 
-	if (strncmp(mensagem, "DISCONNECT\n", 9) == 0) {//verificar se o server enviou a mensagem de despedida, se sim, temos de encerrar o programa
+    write(fd, mensagem, strlen(mensagem));
+	if (strncmp(mensagem, "DISCONNECT\n", 11) == 0) {//verificar se o server enviou a mensagem de despedida, se sim, temos de encerrar o programa
         break;
     }
-    write(fd, mensagem, strlen(mensagem));
   }
 
   close(fd); //fechar o socket

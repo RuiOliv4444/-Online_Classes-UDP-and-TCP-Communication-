@@ -11,51 +11,74 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <netinet/in.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/shm.h>
 #include <signal.h>
+#include <semaphore.h>
+#include <errno.h>
+#include <sys/ipc.h>
+#include <sys/stat.h>
+#include <sys/msg.h>
+#include <fcntl.h>
+#include <sys/time.h>
+#include <ctype.h>
 
 #define BUF_SIZE 512
+#define MAX_USERS 999
+#define MAX_CLASSES 100
+#define MAX_USERS_CLASS 50
 #define TAM 30 
 
 FILE *file;
 char *filename;
 int tcp_fd, udp_fd;
 pid_t p_tcp;
+int shm_id;
 
-struct utilizador {
+typedef struct utilizador {
     char username[TAM];
     char password[TAM];
     char role[TAM];
-};
+}utilizador;
 
-typedef struct us_list { //Struct da lista ligada
-    struct utilizador user;
-    struct us_list * next;
-} us_list;
+typedef struct classes {
+    char name[TAM];
+	char multicast[TAM];
+	int max_alunos;
+	utilizador alunos_turma[MAX_USERS_CLASS];
+}classes;
 
-typedef us_list * lista;
+sem_t * sem_utilizadores;
+sem_t * sem_alunos;
 
-lista cria(void);
+
+typedef struct shared{
+	utilizador users[MAX_USERS]; //lista dos utilizadores que se vao registar
+	classes aulas[MAX_CLASSES];
+}shared;
+
+shared * share;
+
+
+void create_shared();
+void init_shared_struct(shared *share);
 void erro(char *msg);
-void process_client(int client_fd,struct sockaddr_in client_addr, lista lista_utilizadores);
-void login_user(const char *username, const char *password, int *login, lista lista_utilizadores);
-void udp_server_function(unsigned short udp_port,lista lista_utilizadores);
-void tcp_server_function (int tcp_fd, lista lista_utilizadores);
-void list_classes(int client_fd);
-void list_subscribed(int client_fd);
-void subscribe_class(int client_fd);
-void create_class(int client_fd);
+void process_client(int client_fd, struct sockaddr_in client_addr);
+void login_user(const char *username, const char *password, int *login);
+void udp_server_function(unsigned short udp_port);
+void list_classes(int client_fd, const char *nome);
+void list_subscribed(int client_fd, const char *nome);
+int subscribe_class(int client_fd,const char *username, const char *class_name);
+int create_class(int  client_fd, const char *class_name, const char *max_alunos_str);
 void send_cont(int client_fd);
-int add_user(const char *name, const char *pass, const char *ro, lista lista_utilizadores);
-void insere_utilizador(lista lista_utilizadores, struct utilizador person);
-int remove_utilizador(lista *lista_utilizadores, char username[TAM],struct sockaddr_in client_addr, socklen_t addrlen);
-void ler_ficheiro(lista lista_utilizadores);
-void escrever_ficheiro(lista lista_utilizadores);
-void listar_users(lista lista_utilizadores,int udp_fd,struct sockaddr_in client_addr, socklen_t addrlen);
+int add_user(const char *name, const char *pass, const char *ro);
+void insere_utilizador(utilizador person);
+int remove_utilizador(char username[TAM]);
+void ler_ficheiro();
+void escrever_ficheiro();
+void listar_users(int udp_fd, struct sockaddr_in client_addr, socklen_t addrlen);
 int verifica_func(const char aux[TAM]);
 void treat_signal(int sig);
 
