@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
 
 	ler_ficheiro();
 
-	sem_unlink("utilziadores");
+	sem_unlink("utilizadores");
 	sem_unlink("alunos");
 	sem_utilizadores = sem_open("utilizadores", O_CREAT|O_EXCL, 0777,1);
 	sem_alunos = sem_open("alunos", O_CREAT|O_EXCL, 0777,1);
@@ -107,7 +107,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
                 list_subscribed(client_fd, arg1);
             } 
             else if (strcmp(comando, "SUBSCRIBE_CLASS") == 0) {
-                subscribe_classsubscribe_class(client_fd,arg1,arg2);
+                //subscribe_classubscribe_class(client_fd,arg1,arg2);
             } 
             else if (strcmp(comando, "DISCONNECT") == 0) {
                 escrever_ficheiro();
@@ -449,11 +449,15 @@ void treat_signal(int sig){
         kill(p_tcp, SIGTERM);
         waitpid(p_tcp, NULL, 0);
     }
+	
+	sem_close(sem_alunos);
+	sem_close(sem_utilizadores);
 	sem_unlink("utilizadores");
 	sem_unlink("alunos");
-	sem_destroy(sem_alunos);
-	sem_destroy(sem_utilizadores);
+	if(shmdt(share)== -1) printf("ERROR IN shmdt\n");
+	if(shmctl(shm_id, IPC_RMID, NULL) == -1) printf("ERROR IN shmctl\n");
     printf("Servidor encerrado.\n");
+	free(file);
     exit(0);
 }
 
@@ -468,13 +472,13 @@ void create_shared() {
     int shm_size = sizeof(shared);  // Como 'shared' agora contém tudo, não precisamos adicionar mais nada.
 
     if ((shm_id = shmget(IPC_PRIVATE, shm_size, IPC_CREAT | IPC_EXCL | 0700)) < 0) {
-        log_message("ERROR IN SHMGET");
+        printf("ERROR IN SHMGET\n");
         exit(1);
     }
 
     share = (shared *)shmat(shm_id, NULL, 0);
     if (share == (void *)-1) {
-        log_message("ERROR IN SHMAT");
+        printf("ERROR IN SHMAT");
         exit(1);
     }
 
