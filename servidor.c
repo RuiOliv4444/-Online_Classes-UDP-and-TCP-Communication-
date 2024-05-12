@@ -15,10 +15,9 @@ int main(int argc, char *argv[]) {
 	//
 	create_shared();
 	//
+	init_shared_struct(share);
 
-	//init_shared_struct(share);
-
-	//ler_ficheiro();
+	ler_ficheiro();
 
 	sem_unlink("utilizadores");
 	sem_unlink("alunos");
@@ -470,7 +469,7 @@ void erro(char *msg) {
 
 
 void create_shared() {
-    int shm_size = sizeof(shared) + (sizeof(utilizador)*MAX_USERS)+(sizeof(classes)*MAX_CLASSES* MAX_USERS_CLASS);  // Como 'shared' agora contém tudo, não precisamos adicionar mais nada.
+    int shm_size = sizeof(shared);  // Como 'shared' agora contém tudo, não precisamos adicionar mais nada.
 
     if ((shm_id = shmget(IPC_PRIVATE, shm_size, IPC_CREAT | IPC_EXCL | 0700)) < 0) {
         printf("ERROR IN SHMGET\n");
@@ -483,7 +482,8 @@ void create_shared() {
         exit(1);
     }
 
-
+    // Inicialização de valores padrão (opcional)
+    memset(share, 0, shm_size);  // Zera a memória alocada
 }
 
 void init_shared_struct(shared *share) {
