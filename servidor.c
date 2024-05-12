@@ -12,12 +12,14 @@ int main(int argc, char *argv[]) {
     unsigned short udp_port = htons(atoi(argv[2]));
 	filename = malloc(strlen(argv[3]) + 1);
     strcpy(filename, argv[3]);
+
+
 	//
 	create_shared();
 	//
-	init_shared_struct(share);
+	//init_shared_struct(share);
 
-	ler_ficheiro();
+	//ler_ficheiro();
 
 	sem_unlink("utilizadores");
 	sem_unlink("alunos");
@@ -36,9 +38,8 @@ int main(int argc, char *argv[]) {
 		tcp_addr.sin_family = AF_INET;
 		tcp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 		tcp_addr.sin_port = tcp_port;
-	    tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
-		
-
+		if ( (tcp_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) erro("Função socket");
+	 
 		if (bind(tcp_fd, (struct sockaddr*)&tcp_addr, sizeof(tcp_addr)) < 0)
 			erro("Erro no bind do socket TCP");
 
@@ -74,10 +75,24 @@ int main(int argc, char *argv[]) {
 
 void process_client(int client_fd, struct sockaddr_in client_addr) {
     char buffer[BUF_SIZE];
+	//multicast socket creation
+	/*
+	int multicast_socket; //multicast socket
+	struct sockaddr_in multicast_addr;
+	memset(&multicast_addr, 0, sizeof(multicast_addr));
+	multicast_addr.sin_family = AF_INET;
+	multicast_addr.sin_port = htons(MULTICAST_PORT);
+	if((multicast_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+		erro("Error creating socket for multicast group");
 
+	int enable= 1; //increase packet life time (nao faco ideia o que é aqui)
+	if(setsockopt(multicast_socket, IPPROTO_IP, IP_MULTICAST_TTL, &enable, sizeof(enable)) < 0)
+		erro("Error enabling multicast on socket");
+	*/
     char request[] = "LOGIN {username} {password}\n"; //mensagem de aviso para fazer o login
     write(client_fd, request, strlen(request));
     int client_logado = 0;
+
     while (1) { //ficamos sempre a ler as mensagens do utilizador e a lidar com elas, até a mensagem recebida ser "SAIR"
         bzero(buffer, BUF_SIZE);
         char comando[TAM];
@@ -99,26 +114,26 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
                 if (write(client_fd, "REJECTED!\n", strlen("REJECTED!\n")) < 0) perror("Erro ao enviar resposta TCP");
             }
         } 
-        else if (client_logado > 1) { // O admin para ter acesso a esta parte vai ter de se logar primeiro
+        else if (client_logado > 1) { 
             if (strcmp(comando, "LIST_CLASSES") == 0) {
-                list_classes(client_fd, arg1);
+                list_classes(client_fd);
             } 
             else if (strcmp(comando, "LIST_SUBSCRIBED") == 0) {
                 list_subscribed(client_fd, arg1);
             } 
             else if (strcmp(comando, "SUBSCRIBE_CLASS") == 0) {
-                //subscribe_classubscribe_class(client_fd,arg1,arg2);
+                subscribe_class(client_fd, arg1, arg2);
             } 
             else if (strcmp(comando, "DISCONNECT") == 0) {
                 escrever_ficheiro();
                 close(client_fd);
                 break;
             }
-            else if (strcmp(comando, "CREATE_CLASS") == 0 && client_logado == 3) {
+            else if (strcmp(comando, "CREATE_CLASS") == 0 && client_logado == 3) { //professor
                 create_class(client_fd, arg1, arg2);
             }
             else if (strcmp(comando, "SEND") == 0 && client_logado == 3) {
-                send_cont(client_fd);
+                //send_cont(client_fd, arg1, arg2,multicast_socket, multicast_addr);
             }
             else {
                 char message[] = "Comando desconhecido.\n";
@@ -133,11 +148,11 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 }
 
 
-void list_classes(int client_fd, const char *nome) {
+void list_classes(int client_fd) {
     char buffer[BUF_SIZE];
 	sem_wait(sem_alunos);
     for (int i = 0; i < MAX_CLASSES; i++) {
-        if ((share->aulas[i].name[0] != '\0') && (is_user_in_class(nome, share->aulas[i].name) == 0)) { // Apenas listamos classes que tenham um nome definido (não vazias)
+        if (share->aulas[i].name[0] != '\0'){ // Apenas listamos classes que tenham um nome definido (não vazias)
             int num_students = 0;
             for (int j = 0; j < MAX_USERS_CLASS; j++) {
                 if (share->aulas[i].alunos_turma[j].username[0] != '\0') {
@@ -169,7 +184,7 @@ void list_subscribed(int client_fd, const char *nome) {
 		}
 	}
 	sem_post(sem_alunos);
-	if(cont==0)	send(client_fd, "O utilizador não está inscrito em nenumha aula.\n", strlen( "O utilizador não está inscrito em nenumha aula.\n"), 0);
+	if(cont==0)	send(client_fd, "O utilizador não está inscrito em nenhuma aula.\n", strlen( "O utilizador não está inscrito em nenhuma aula.\n"), 0);
     //char message[] = "Esta é uma função protótipo para listar as classes em que participas.\n";
     //write(client_fd, message, strlen(message));
 }
@@ -221,6 +236,7 @@ int create_class(int  client_fd, const char *class_name, const char *max_alunos_
 			sem_post(sem_alunos);
 			send(client_fd, "Classe criada com sucesso.\n", strlen("Classe criada com sucesso.\n"), 0);
             return 1; // Sucesso na criação da classe
+
         } else if (strcmp(share->aulas[i].name, class_name) == 0) {
 			sem_post(sem_alunos);
 			send(client_fd, "Nome da classe já existe.\n", strlen("Nome da classe já existe.\n"), 0);
@@ -232,11 +248,12 @@ int create_class(int  client_fd, const char *class_name, const char *max_alunos_
     return 0; // Retorna 0 se não houver espaço disponível para novas classes
 }
 
-void send_cont(int client_fd) {
+void send_cont(int client_fd,const char *arg1, const char *arg2, int multicast_socket, struct sockaddr_in multicast_addr) {
 
     char message[] = "Esta é uma função protótipo para enviar conteúdo para uma aula.\n";
     write(client_fd, message, strlen(message));
 }
+
 
 int is_user_in_class(const char *username, const char *class_name) {
     for (int i = 0; i < MAX_CLASSES; i++) {
@@ -469,12 +486,11 @@ void erro(char *msg) {
 
 
 void create_shared() {
-    int shm_size = sizeof(shared);  // Como 'shared' agora contém tudo, não precisamos adicionar mais nada.
-
+    int shm_size = sizeof(shared);
     if ((shm_id = shmget(IPC_PRIVATE, shm_size, IPC_CREAT | IPC_EXCL | 0700)) < 0) {
-        printf("ERROR IN SHMGET\n");
-        exit(1);
-    }
+    	perror("ERROR IN SHMGET");
+    	exit(1);
+	}
 
     share = (shared *)shmat(shm_id, NULL, 0);
     if (share == (void *)-1) {
@@ -487,24 +503,19 @@ void create_shared() {
 }
 
 void init_shared_struct(shared *share) {
+
+	if (!share)
+		printf("Não existe memoria partilhada"); // Added null check for safety
+
     // Inicializar todos os utilizadores
     for (int i = 0; i < MAX_USERS; i++) {
-        memset(share->users[i].username, 0, TAM);
-        memset(share->users[i].password, 0, TAM);
-        memset(share->users[i].role, 0, TAM);
+        memset(&share->users[i], 0, sizeof(utilizador));
     }
 
-    // Inicializar todas as classes
+    // Initialize classes
     for (int i = 0; i < MAX_CLASSES; i++) {
-        memset(share->aulas[i].name, 0, TAM);
-        memset(share->aulas[i].multicast, 0, TAM);
+        memset(&share->aulas[i], 0, sizeof(classes));
         share->aulas[i].max_alunos = -1;
-
-        // Inicializar os alunos em cada turma
-        for (int j = 0; j < MAX_USERS_CLASS; j++) {
-            memset(share->aulas[i].alunos_turma[j].username, 0, TAM);
-            memset(share->aulas[i].alunos_turma[j].password, 0, TAM);
-            memset(share->aulas[i].alunos_turma[j].role, 0, TAM);
-        }
     }
+ 
 }
