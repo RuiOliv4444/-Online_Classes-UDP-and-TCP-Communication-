@@ -135,6 +135,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 
 void list_classes(int client_fd, const char *nome) {
     char buffer[BUF_SIZE];
+	int existe = 0;
 	sem_wait(sem_alunos);
     for (int i = 0; i < MAX_CLASSES; i++) {
         if ((share->aulas[i].name[0] != '\0') && (is_user_in_class(nome, share->aulas[i].name) == 0)) { // Apenas listamos classes que tenham um nome definido (não vazias)
@@ -149,11 +150,14 @@ void list_classes(int client_fd, const char *nome) {
             snprintf(buffer, BUF_SIZE, "Classe: %s, Multicast: %s, Alunos: %d/%d\n",
                      share->aulas[i].name, share->aulas[i].multicast, num_students, share->aulas[i].max_alunos);
             send(client_fd, buffer, strlen(buffer), 0); // Envia a informação da classe para o cliente
+			existe = 1;
         }
+		
 	}
 	sem_post(sem_alunos);
-    //char message[] = "Esta é uma função protótipo para listar as classes.\n";
-    //write(client_fd, message, strlen(message));
+	if (!existe){
+		send(client_fd, "Não existem classes", strlen("Não existem classes"), 0);
+	}
 }
 
 void list_subscribed(int client_fd, const char *nome) {
@@ -281,7 +285,12 @@ void udp_server_function(unsigned short udp_port) {
     int admin_logado = 0;
 
     while (1) {
-        memset(buf, 0, sizeof(buf));
+        memset(buf, '\0', sizeof(buf));
+		memset(comando, '\0', sizeof(comando));
+		memset(arg1, '\0', sizeof(arg1));
+		memset(arg2, '\0', sizeof(arg2));
+		memset(arg3, '\0', sizeof(arg3));
+
         int bytes_received = recvfrom(udp_fd, buf, BUF_SIZE, 0, (struct sockaddr*)&client_addr, &addrlen);
         if (bytes_received < 0) {
             perror("Erro ao receber dados UDP");
@@ -289,62 +298,81 @@ void udp_server_function(unsigned short udp_port) {
         }
 
         sscanf(buf, "%s %s %s %s", comando, arg1, arg2, arg3);
-        if (strcmp(comando, "LOGIN") == 0) {
-            login_user(arg1, arg2, &admin_logado);
-            const char *msg = (admin_logado > 0) ? "Login efetuado com sucesso!\n" : "Dados de acesso inválidos!\n";
-            sendto(udp_fd, msg, strlen(msg), 0, (struct sockaddr*) &client_addr, addrlen);
-        } else if (admin_logado > 0) {
-            if (strcmp(comando, "ADD_USER") == 0) {
-                // Supõe que add_user já foi adaptada para array
-                if (add_user(arg1, arg2, arg3)) {
-                    sendto(udp_fd, "Utilizador adicionado com sucesso.\n", strlen("Utilizador adicionado com sucesso.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
-                } else {
-                    sendto(udp_fd, "Cargo nao existente.\n", strlen("Cargo nao existente.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
-                }
-            } else if (strcmp(comando, "DEL") == 0) {
-                if (remove_utilizador(arg1)) {
-                    sendto(udp_fd, "Utilizador eliminado com sucesso.\n", strlen("Utilizador eliminado com sucesso.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
-                } else {
-                    sendto(udp_fd, "Utilizador não encontrado.\n", strlen("Utilizador não encontrado.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
-                }
-            } else if (strcmp(comando, "LIST") == 0) {
-                listar_users(udp_fd, client_addr, addrlen);
-            } else if (strcmp(comando, "QUIT_SERVER") == 0) {
-                // Supõe que escrever_ficheiro já foi adaptada para array
-                escrever_ficheiro();
-                printf("Servidor UDP encerrando...\n");
-                fflush(stdout);
-                close(udp_fd);
-                break;
-            } else {
-                sendto(udp_fd, "Comando desconhecido.\n", strlen("Comando desconhecido.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
-            }
-        } else {
-            sendto(udp_fd, "Inicia sessão primeiramente!\n", strlen("Inicia sessão primeiramente!\n"), 0, (struct sockaddr*)&client_addr, addrlen);
-        }
+		if (strcmp(buf, "X") != 0 && strlen(buf) != 1) {
+			if (strcmp(comando, "LOGIN") == 0) {
+
+				login_user(arg1, arg2, &admin_logado);
+				if(admin_logado == 1){//mensagem de ter conseguido logar
+					sendto(udp_fd, "Login efetuado com sucesso!\n", strlen("Login efetuado com sucesso!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+				}
+				else{//mensagem de não ter conseguido logar
+					sendto(udp_fd, "Dados de acesso inválidos!\n", strlen("Dados de acesso inválidos!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+				}
+			} 
+			else if (admin_logado > 0) {
+				if (strcmp(comando, "ADD_USER") == 0) {
+
+					if (add_user(arg1, arg2, arg3)) {
+						sendto(udp_fd, "Utilizador adicionado com sucesso.\n", strlen("Utilizador adicionado com sucesso.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
+					} else {
+						sendto(udp_fd, "Cargo nao existente.\n", strlen("Cargo nao existente.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
+					}
+				} else if (strcmp(comando, "DEL") == 0) {
+					if (remove_utilizador(arg1)) {
+						sendto(udp_fd, "Utilizador eliminado com sucesso.\n", strlen("Utilizador eliminado com sucesso.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
+					} else {
+						sendto(udp_fd, "Utilizador não encontrado.\n", strlen("Utilizador não encontrado.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
+					}
+				} else if (strcmp(comando, "LIST") == 0) {
+					listar_users(udp_fd, client_addr, addrlen);
+				} else if (strcmp(comando, "QUIT_SERVER") == 0) {
+
+					escrever_ficheiro();
+					printf("Servidor UDP encerrando...\n");
+					fflush(stdout);
+					kill(p_tcp, SIGTERM);
+                    waitpid(p_tcp, NULL, 0); // Espera o filho terminar
+                    break;
+
+				} else {
+					sendto(udp_fd, "Comando desconhecido.\n", strlen("Comando desconhecido.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
+				}
+			} else {
+				sendto(udp_fd, "Inicia sessão primeiramente!\n", strlen("Inicia sessão primeiramente!\n"), 0, (struct sockaddr*)&client_addr, addrlen);
+			}
+		}else if(strcmp(buf, "X") != 0 ){
+			sendto(udp_fd, "Nenhum comando recebido!\n", strlen("Nenhum comando recebido!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
+    		continue;
+		}else
+			continue;
     }
+	close(udp_fd);
 }
 
 
 void login_user(const char *username, const char *password, int *login) {
-    *login = 0; // Define o status de login inicial como falha
+    *login = 0; 
     for (int i = 0; i < MAX_USERS; i++) {
-        if (share->users[i].username[0] != '\0' && // Checa se o usuário está ativo
+        if (share->users[i].username[0] != '\0' &&  // Checa se o usuário está ativo
             strcmp(username, share->users[i].username) == 0 && 
             strcmp(password, share->users[i].password) == 0) {
             
             if (strcmp(share->users[i].role, "administrador") == 0) {
                 *login = 1; // Sucesso no login como administrador
+				sem_post(sem_utilizadores);
                 return;
             } else if (strcmp(share->users[i].role, "aluno") == 0) {
                 *login = 2; // Sucesso no login como aluno
+				sem_post(sem_utilizadores);
                 return;
             } else if (strcmp(share->users[i].role, "professor") == 0) {
                 *login = 3; // Sucesso no login como professor
+				sem_post(sem_utilizadores);
                 return;
             }
         }
     }
+	sem_post(sem_utilizadores);
     // Se chegar aqui, significa que não encontrou um usuário com as credenciais fornecidas
 }
 
