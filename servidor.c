@@ -3,10 +3,8 @@
 #include <string.h>
 
 int main(int argc, char *argv[]) {
-	if (argc != 4) {
-    	printf("news_server {PORTO_CLIENT} {PORTO_ADMIN} {ficheiro texto}\n"); 
-    	exit(-1);
-  	}
+
+	signal(SIGINT, treat_signal);
 
 	unsigned short tcp_port = htons(atoi(argv[1]));
     unsigned short udp_port = htons(atoi(argv[2]));
@@ -48,7 +46,7 @@ int main(int argc, char *argv[]) {
 		int client;
 		client_addr_size = sizeof(tcp_addr);
 
-		signal(SIGTERM, treat_signal);
+
 
 		while (1) {
 			client = accept(tcp_fd, (struct sockaddr *)&tcp_addr, &client_addr_size);
@@ -108,9 +106,9 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
             } 
             else if (strcmp(comando, "SUBSCRIBE_CLASS") == 0) {
 				//SUBSCRIBE_CLASS <name>
-                subscribe_class(client_fd,arg1,arg2); //não funciona
+                subscribe_class(client_fd,arg1,arg2); 
             } 
-            else if (strcmp(comando, "DISCONNECT") == 0) { //não funciona
+            else if (strcmp(comando, "DISCONNECT") == 0) { 
                 escrever_ficheiro();
                 close(client_fd);
                 break;
@@ -264,29 +262,27 @@ void udp_server_function(unsigned short udp_port) {
     socklen_t addrlen = sizeof(client_addr);
     char buf[BUF_SIZE], comando[TAM], arg1[TAM], arg2[TAM], arg3[TAM];
 
-    // Cria um socket UDP
     int udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_fd < 0) {
         perror("Erro ao criar socket UDP");
         exit(EXIT_FAILURE);
     }
 
-    // Configura o endereço do servidor
     memset(&udp_addr, 0, sizeof(udp_addr));
     udp_addr.sin_family = AF_INET;
     udp_addr.sin_port = htons(udp_port);
     udp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    // Vincula (bind) o socket ao endereço/porta
     if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0) {
         perror("Erro no bind do socket UDP");
         close(udp_fd);
         exit(EXIT_FAILURE);
     }
 
-    int admin_logado = 0;
-
+    printf("Servidor UDP rodando e aguardando dados...\n");
+	int admin_logado = 0;
     while (1) {
+		printf("IM HERE1\n");
         memset(buf, '\0', sizeof(buf));
 		memset(comando, '\0', sizeof(comando));
 		memset(arg1, '\0', sizeof(arg1));
@@ -298,11 +294,16 @@ void udp_server_function(unsigned short udp_port) {
             perror("Erro ao receber dados UDP");
             continue;
         }
+        if (bytes_received == 0) {
+            printf("Nenhum dado recebido\n");
+            continue;
+        }
+        printf("Dados recebidos: %s\n", buf);
 
         sscanf(buf, "%s %s %s %s", comando, arg1, arg2, arg3);
 		if (strcmp(buf, "X") != 0 && strlen(buf) != 1) {
 			if (strcmp(comando, "LOGIN") == 0) {
-
+				printf("ANALISAR O LOGIN\n");
 				login_user(arg1, arg2, &admin_logado);
 				if(admin_logado == 1){//mensagem de ter conseguido logar
 					sendto(udp_fd, "Login efetuado com sucesso!\n", strlen("Login efetuado com sucesso!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
@@ -311,7 +312,7 @@ void udp_server_function(unsigned short udp_port) {
 					sendto(udp_fd, "Dados de acesso inválidos!\n", strlen("Dados de acesso inválidos!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
 				}
 			} 
-			else if (admin_logado > 0) {
+			else if (admin_logado == 1) {
 				if (strcmp(comando, "ADD_USER") == 0) {
 
 					if (add_user(arg1, arg2, arg3)) {
@@ -475,7 +476,7 @@ void escrever_ficheiro() {
 }
 
 void treat_signal(int sig){
-     if (p_tcp != 0) {
+    if (p_tcp != 0) {
         kill(p_tcp, SIGTERM);
         waitpid(p_tcp, NULL, 0);
     }
@@ -484,8 +485,12 @@ void treat_signal(int sig){
 	sem_close(sem_utilizadores);
 	sem_unlink("utilizadores");
 	sem_unlink("alunos");
-	if(shmdt(share)== -1) printf("ERROR IN shmdt\n");
-	if(shmctl(shm_id, IPC_RMID, NULL) == -1) printf("ERROR IN shmctl\n");
+	if (shmdt(share) == -1) {
+		perror("ERROR IN shmdt");
+	}
+	if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
+		perror("ERROR IN shmctl");
+	}
     printf("Servidor encerrado.\n");
 	free(file);
     exit(0);
