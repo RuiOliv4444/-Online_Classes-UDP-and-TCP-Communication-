@@ -107,9 +107,10 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
                 list_subscribed(client_fd, arg1);
             } 
             else if (strcmp(comando, "SUBSCRIBE_CLASS") == 0) {
-                //subscribe_classubscribe_class(client_fd,arg1,arg2);
+				//SUBSCRIBE_CLASS <name>
+                subscribe_class(client_fd,arg1,arg2); //não funciona
             } 
-            else if (strcmp(comando, "DISCONNECT") == 0) {
+            else if (strcmp(comando, "DISCONNECT") == 0) { //não funciona
                 escrever_ficheiro();
                 close(client_fd);
                 break;
@@ -117,7 +118,8 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
             else if (strcmp(comando, "CREATE_CLASS") == 0 && client_logado == 3) {
                 create_class(client_fd, arg1, arg2);
             }
-            else if (strcmp(comando, "SEND") == 0 && client_logado == 3) {
+            else if (strcmp(comando, "SEND") == 0 && client_logado == 3) { //não funciona
+				//SEND name text
                 send_cont(client_fd);
             }
             else {
