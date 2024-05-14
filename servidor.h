@@ -70,7 +70,7 @@ void erro(char *msg);
 void process_client(int client_fd, struct sockaddr_in client_addr);
 void login_user(const char *username, const char *password, int *login);
 void udp_server_function(unsigned short udp_port);
-void list_classes(int client_fd, const char *nome);
+void list_classes(int client_fd);
 void list_subscribed(int client_fd, const char *nome);
 int subscribe_class(int client_fd,const char *username, const char *class_name);
 int create_class(int  client_fd, const char *class_name, const char *max_alunos_str, const char *prof);

@@ -115,17 +115,17 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
             }
         } 
         else if (client_logado > 1) { // O admin para ter acesso a esta parte vai ter de se logar primeiro
-            if (strcmp(comando, "LIST_CLASSES") == 0) {
-                list_classes(client_fd, arg1);
+            if (strcmp(comando, "LIST_CLASSES") == 0) { 
+                list_classes(client_fd);
             } 
             else if (strcmp(comando, "LIST_SUBSCRIBED") == 0) {
-                list_subscribed(client_fd, arg1);
+                list_subscribed(client_fd,nome);
             } 
             else if (strcmp(comando, "SUBSCRIBE_CLASS") == 0) {
-				//SUBSCRIBE_CLASS <name> 
+				//SUBSCRIBE_CLASS <name> verificar argumentos
                 subscribe_class(client_fd,nome,arg1); 
             } 
-            else if (strcmp(comando, "DISCONNECT") == 0) { 
+            else if (strcmp(comando, "DISCONNECT") == 0) { //não funciona
                 escrever_ficheiro();
                 close(client_fd);
                 break;
@@ -150,7 +150,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 }
 
 
-void list_classes(int client_fd, const char *nome) {
+void list_classes(int client_fd) {
     char buffer[BUF_SIZE];
 	int existe = 0;
 	sem_wait(sem_alunos);
@@ -192,9 +192,8 @@ void list_subscribed(int client_fd, const char *nome) {
 		}
 	}
 	sem_post(sem_alunos);
-	if(cont==0)	send(client_fd, "O utilizador não está inscrito em nenumha aula.\n", strlen( "O utilizador não está inscrito em nenumha aula.\n"), 0);
-    //char message[] = "Esta é uma função protótipo para listar as classes em que participas.\n";
-    //write(client_fd, message, strlen(message));
+	if(cont==0)	send(client_fd, "O utilizador não está inscrito em nenhuma aula.\n", strlen( "O utilizador não está inscrito em nennhuma aula.\n"), 0);
+
 }
 
 int subscribe_class(int client_fd,const char *username, const char *class_name){
@@ -280,6 +279,7 @@ void send_cont(int client_fd, const char *class_name,const char *message, int mu
         if (strcmp(share->aulas[i].name, class_name) == 0) { 
 			if(strcmp(nome, share->aulas->prof)==0){
 				multicast_addr.sin_addr.s_addr = inet_addr(share->aulas[i].multicast);
+
 				if(sendto(multicast_socket, message, strlen(message), 0, (struct sockaddr*)&multicast_addr, sizeof(multicast_addr)) < 0)
 					perror("Erro a enviar mensagem para o grupo multicast");
 				write(client_fd, "Mensagem enviada!\n", strlen("Mensagem enviada!\n"));
@@ -391,6 +391,19 @@ void udp_server_function(unsigned short udp_port) {
 					fflush(stdout);
 					kill(p_tcp, SIGTERM);
                     waitpid(p_tcp, NULL, 0); // Espera o filho terminar
+					sem_close(sem_alunos);
+					sem_close(sem_utilizadores);
+					sem_unlink("utilizadores");
+					sem_unlink("alunos");
+					if (shmdt(share) == -1) {
+						perror("ERROR IN shmdt");
+					}
+					if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
+						perror("ERROR IN shmctl");
+					}
+					printf("Servidor encerrado.\n");
+					free(file);
+
                     break;
 
 				} 
@@ -551,6 +564,7 @@ void escrever_ficheiro() {
 }
 
 void treat_signal(int sig){
+	escrever_ficheiro();
     if (p_tcp != 0) {
         kill(p_tcp, SIGTERM);
         waitpid(p_tcp, NULL, 0);
