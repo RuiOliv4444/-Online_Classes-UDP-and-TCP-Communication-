@@ -260,30 +260,32 @@ int is_user_in_class(const char *username, const char *class_name) {
 void udp_server_function(unsigned short udp_port) {
     struct sockaddr_in udp_addr, client_addr;
     socklen_t addrlen = sizeof(client_addr);
-    char buf[BUF_SIZE], comando[TAM], arg1[TAM], arg2[TAM], arg3[TAM];
+    char buf[BUF_SIZE], comando[TAM],arg1[TAM], arg2[TAM], arg3[TAM];
 
-    int udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+     // Cria um socket UDP
+    udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_fd < 0) {
-        perror("Erro ao criar socket UDP");
+        erro("Erro ao criar socket UDP");
         exit(EXIT_FAILURE);
     }
 
+    // Configura o endereço do servidor
     memset(&udp_addr, 0, sizeof(udp_addr));
     udp_addr.sin_family = AF_INET;
-    udp_addr.sin_port = htons(udp_port);
-    udp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    udp_addr.sin_port = udp_port;
+    udp_addr.sin_addr.s_addr = htonl(INADDR_ANY); // Aceita conexões em qualquer interface de rede
 
+    // Vincula (bind) o socket ao endereço/porta
     if (bind(udp_fd, (struct sockaddr*)&udp_addr, sizeof(udp_addr)) < 0) {
-        perror("Erro no bind do socket UDP");
+        erro("Erro no bind do socket UDP");
         close(udp_fd);
         exit(EXIT_FAILURE);
     }
 
-    printf("Servidor UDP rodando e aguardando dados...\n");
 	int admin_logado = 0;
     while (1) {
-		printf("IM HERE1\n");
-        memset(buf, '\0', sizeof(buf));
+		memset(buf, '\0', sizeof(buf));
 		memset(comando, '\0', sizeof(comando));
 		memset(arg1, '\0', sizeof(arg1));
 		memset(arg2, '\0', sizeof(arg2));
@@ -293,21 +295,19 @@ void udp_server_function(unsigned short udp_port) {
         if (bytes_received < 0) {
             perror("Erro ao receber dados UDP");
             continue;
-        }
-        if (bytes_received == 0) {
-            printf("Nenhum dado recebido\n");
-            continue;
-        }
-        printf("Dados recebidos: %s\n", buf);
+		}
+
 
         sscanf(buf, "%s %s %s %s", comando, arg1, arg2, arg3);
 		if (strcmp(buf, "X") != 0 && strlen(buf) != 1) {
 			if (strcmp(comando, "LOGIN") == 0) {
 				printf("ANALISAR O LOGIN\n");
 				login_user(arg1, arg2, &admin_logado);
+
 				if(admin_logado == 1){//mensagem de ter conseguido logar
 					sendto(udp_fd, "Login efetuado com sucesso!\n", strlen("Login efetuado com sucesso!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
 				}
+
 				else{//mensagem de não ter conseguido logar
 					sendto(udp_fd, "Dados de acesso inválidos!\n", strlen("Dados de acesso inválidos!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
 				}
@@ -320,16 +320,19 @@ void udp_server_function(unsigned short udp_port) {
 					} else {
 						sendto(udp_fd, "Cargo nao existente.\n", strlen("Cargo nao existente.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
 					}
-				} else if (strcmp(comando, "DEL") == 0) {
+				} 
+				else if (strcmp(comando, "DEL") == 0) {
 					if (remove_utilizador(arg1)) {
 						sendto(udp_fd, "Utilizador eliminado com sucesso.\n", strlen("Utilizador eliminado com sucesso.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
 					} else {
 						sendto(udp_fd, "Utilizador não encontrado.\n", strlen("Utilizador não encontrado.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
 					}
-				} else if (strcmp(comando, "LIST") == 0) {
+				} 
+				else if (strcmp(comando, "LIST") == 0) {
 					listar_users(udp_fd, client_addr, addrlen);
-				} else if (strcmp(comando, "QUIT_SERVER") == 0) {
 
+				} 
+				else if (strcmp(comando, "QUIT_SERVER") == 0) {
 					escrever_ficheiro();
 					printf("Servidor UDP encerrando...\n");
 					fflush(stdout);
@@ -337,16 +340,20 @@ void udp_server_function(unsigned short udp_port) {
                     waitpid(p_tcp, NULL, 0); // Espera o filho terminar
                     break;
 
-				} else {
+				} 
+				else {
 					sendto(udp_fd, "Comando desconhecido.\n", strlen("Comando desconhecido.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
 				}
-			} else {
+			} 
+			else {
 				sendto(udp_fd, "Inicia sessão primeiramente!\n", strlen("Inicia sessão primeiramente!\n"), 0, (struct sockaddr*)&client_addr, addrlen);
 			}
-		}else if(strcmp(buf, "X") != 0 ){
+		}
+		else if(strcmp(buf, "X") != 0 ){
 			sendto(udp_fd, "Nenhum comando recebido!\n", strlen("Nenhum comando recebido!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
     		continue;
-		}else
+		}
+		else
 			continue;
     }
 	close(udp_fd);
