@@ -30,6 +30,7 @@
 #define MAX_CLASSES 100
 #define MAX_USERS_CLASS 50
 #define TAM 30 
+#define MULTICAST_PORT 8888
 
 FILE *file;
 char *filename;
@@ -71,10 +72,9 @@ void login_user(const char *username, const char *password, int *login);
 void udp_server_function(unsigned short udp_port);
 void list_classes(int client_fd, const char *nome);
 void list_subscribed(int client_fd, const char *nome);
-void subscribe_classubscribe_class(int client_fd,const char *arg1, const char *arg2);
 int subscribe_class(int client_fd,const char *username, const char *class_name);
 int create_class(int  client_fd, const char *class_name, const char *max_alunos_str);
-void send_cont(int client_fd);
+void send_cont(int client_fd, const char *class_name,const char *message, int multicast_socket, struct sockaddr_in multicast_addr,const char *nome);
 int is_user_in_class(const char *username, const char *class_name);
 int add_user(const char *name, const char *pass, const char *ro);
 void insere_utilizador(utilizador person);

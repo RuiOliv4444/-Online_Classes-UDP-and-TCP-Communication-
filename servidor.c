@@ -71,6 +71,22 @@ int main(int argc, char *argv[]) {
 
 
 void process_client(int client_fd, struct sockaddr_in client_addr) {
+
+	int multicast_socket; //multicast socket
+	struct sockaddr_in multicast_addr;
+	memset(&multicast_addr, 0, sizeof(multicast_addr));
+	multicast_addr.sin_family = AF_INET;
+	multicast_addr.sin_port = htons(MULTICAST_PORT);
+
+	if((multicast_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+		error("Error creating socket for multicast group");
+
+	int mreq = 2; //increase packet life time
+	if(setsockopt(multicast_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
+		error("Error enabling multicast on socket");
+
+
+
     char buffer[BUF_SIZE];
 	char nome[BUF_SIZE];
     char request[] = "LOGIN {username} {password}\n"; //mensagem de aviso para fazer o login
@@ -119,7 +135,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
             }
             else if (strcmp(comando, "SEND") == 0 && client_logado == 3) { //não funciona
 				//SEND name text
-                send_cont(client_fd);
+                send_cont(client_fd, arg1, arg2, multicast_socket, multicast_addr, nome);
             }
             else {
                 char message[] = "Comando desconhecido.\n";
@@ -198,12 +214,14 @@ int subscribe_class(int client_fd,const char *username, const char *class_name){
                 if (share->aulas[i].alunos_turma[j].username[0] == '\0') {  // Encontrar espaço vazio
                     strncpy(share->aulas[i].alunos_turma[j].username, username, TAM);
 					sem_post(sem_alunos);
-					send(client_fd, "Utilizador adicionado à turma com sucesso.\n", strlen("Utilizador adicionado à turma com sucesso.\n"), 0);
+					char mensagem[BUF_SIZE];
+					snprintf(mensagem,sizeof(mensagem),"Utilizador adicionado à turma com sucesso.\nEndereço Multicast: <%s>\n",share->aulas[i].multicast);
+					send(client_fd,mensagem, strlen(mensagem), 0);
                     return 1;  // Sucesso ao adicionar o utilizador
                 }
             }
 			sem_post(sem_alunos);
-			send(client_fd, "Utilizador adicionado à turma com sucesso.\n", strlen("Utilizador adicionado à turma com sucesso.\n"), 0);
+			send(client_fd, "A turma já se encontra cheia.\n", strlen("A turma já se encontra cheia.\n"), 0);
             return 3;  // Turma cheia
         }
     }
@@ -213,6 +231,7 @@ int subscribe_class(int client_fd,const char *username, const char *class_name){
 }
 
 int create_class(int  client_fd, const char *class_name, const char *max_alunos_str) {
+	int id;
     int max_alunos = atoi(max_alunos_str); // Converte a string do tamanho máximo para um inteiro
     if (max_alunos < 1 || max_alunos > MAX_USERS_CLASS) {
 		send(client_fd, "Número de alunos inválido.\n", strlen("Número de alunos inválido.\n"), 0);
@@ -221,12 +240,28 @@ int create_class(int  client_fd, const char *class_name, const char *max_alunos_
 	sem_wait(sem_alunos);
     for (int i = 0; i < MAX_CLASSES; i++) {
         if (share->aulas[i].name[0] == '\0') { // Procura por um espaço livre no array de classes
+			id = i;
+			char mensagem [BUF_SIZE];
             strncpy(share->aulas[i].name, class_name, TAM - 1); // Define o nome da classe
             share->aulas[i].name[TAM - 1] = '\0'; // Garante que a string seja terminada corretamente
             share->aulas[i].max_alunos = max_alunos; // Define o número máximo de alunos
             memset(share->aulas[i].alunos_turma, 0, sizeof(share->aulas[i].alunos_turma)); // Inicializa a lista de alunos
+
+			//set the multicast base address
+			struct in_addr multicast_base = { htonl(0xEF000000) };
+			//add the group id to the base address
+			multicast_base.s_addr = htonl(ntohl(multicast_base.s_addr) + id);
+			//convert the multicast address to a string
+			char multicast_addr_str[INET_ADDRSTRLEN];
+			if(inet_ntop(AF_INET, &multicast_base, multicast_addr_str, sizeof(multicast_addr_str)) == NULL)
+				error("Error converting multicast address to a string");
+
+			//copying multicast address to respective multicast group struct addr
+			strcpy(share->aulas[i].multicast, multicast_addr_str);
 			sem_post(sem_alunos);
-			send(client_fd, "Classe criada com sucesso.\n", strlen("Classe criada com sucesso.\n"), 0);
+			snprintf(mensagem,sizeof(mensagem),"OK <%s>\n",share->aulas[i].multicast);
+			send(client_fd,mensagem, strlen(mensagem), 0);
+
             return 1; // Sucesso na criação da classe
         } else if (strcmp(share->aulas[i].name, class_name) == 0) {
 			sem_post(sem_alunos);
@@ -239,10 +274,22 @@ int create_class(int  client_fd, const char *class_name, const char *max_alunos_
     return 0; // Retorna 0 se não houver espaço disponível para novas classes
 }
 
-void send_cont(int client_fd) {
-
-    char message[] = "Esta é uma função protótipo para enviar conteúdo para uma aula.\n";
-    write(client_fd, message, strlen(message));
+void send_cont(int client_fd, const char *class_name,const char *message, int multicast_socket, struct sockaddr_in multicast_addr,const char *nome){
+	for (int i = 0; i < MAX_CLASSES; i++) {
+        if (strcmp(share->aulas[i].name, class_name) == 0) { 
+			if(strcmp(nome, share->aulas->prof)==0){
+				multicast_addr.sin_addr.s_addr = inet_addr(share->aulas[i].multicast);
+				if(sendto(multicast_socket, message, strlen(message), 0, (struct sockaddr*)&multicast_addr, sizeof(multicast_addr)) < 0)
+					error("Erro a enviar mensagem para o grupo multicast");
+				write(client_fd, "Mensagem enviada!\n", strlen("Mensagem enviada!\n"));
+				return;
+			}else{
+				write(client_fd, "Não é o professor regente desta aula!\n", strlen("Não é o professor regente desta aula!\n"));
+				return;
+			}
+		}
+	}
+	write(client_fd, "Turma selecioanda não existe!\n", strlen("Turma selecioanda não existe!\n"));
 }
 
 int is_user_in_class(const char *username, const char *class_name) {
