@@ -16,11 +16,12 @@
 
 void erro(char *msg);
 void join_multicast(const char *multicast, int port);
-void listen_class(void* arg);
+void close_connections();
+void* listen_class(void* arg);
 void sigint_handler();
 
 int fd;
-int classes=0;
+int classe=0;
 int sockets[MAX_CLASSES_PER_USER];
 struct ip_mreq mreqs[MAX_CLASSES_PER_USER];
 char groups[MAX_CLASSES_PER_USER][16];
@@ -91,8 +92,10 @@ int main(int argc, char *argv[]) {
     }
 	char *resultado = strstr(mensagem, "SUBSCRIBE_CLASS");
     if (resultado != NULL) {
+		printf("DENTRO 1\n");
 		i=1;
     } else {
+		printf("DENTRO 2\n");
 		i=0;
     }
   }
@@ -106,14 +109,14 @@ void join_multicast(const char *multicast, int port){
     struct ip_mreq mreq;
 
     //create socket
-    if ((sockets[classes] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    if ((sockets[classe] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("socket");
         exit(1);
     }
 
     //reuse port
     int optval = 1;
-    setsockopt(sockets[classes], SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    setsockopt(sockets[classe], SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 
     //bind to all local interfaces
     memset(&addr, 0, sizeof(addr));
@@ -121,7 +124,7 @@ void join_multicast(const char *multicast, int port){
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(MULTICAST_PORT);
 
-    if (bind(sockets[classes], (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    if (bind(sockets[classe], (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("bind");
         exit(1);
     }
@@ -130,23 +133,23 @@ void join_multicast(const char *multicast, int port){
     mreq.imr_multiaddr.s_addr = inet_addr(multicast);
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 
-    if (setsockopt(sockets[classes], IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+    if (setsockopt(sockets[classe], IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
         perror("setsockopt");
     }
 
     //add to mreq struct array
-    mreqs[classes-0] = mreq;
+    mreqs[classe-0] = mreq;
 
     //start listening thread
     pthread_t thread;
-    pthread_create(&thread, NULL, listen_class, &sockets[classes]);
+    pthread_create(&thread, NULL, listen_class, &sockets[classe]);
 
     //add to groups array
-    strncpy(groups[classes], multicast, sizeof(groups[classes]));
-    classes++;
+    strncpy(groups[classe], multicast, sizeof(groups[classe]));
+    classe++;
 }
 
-void listen_class(void* arg){
+void* listen_class(void* arg){
 	printf("STARTING TO LISTEN\n");
     int socket = *(int*)arg;
 
@@ -166,7 +169,7 @@ void listen_class(void* arg){
         fflush(stdout);
     }
 
-    return NULL;
+	return NULL;
 }
 
 
@@ -183,7 +186,7 @@ void sigint_handler(){
 }
 
 void close_connections(){
-    for(int i=0; i<classes; i++){
+    for(int i=0; i<classe; i++){
         if (setsockopt(sockets[i], IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreqs[i], sizeof(mreqs[i])) < 0) {
             perror("setsockopt");
             exit(1);
