@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 
 void process_client(int client_fd, struct sockaddr_in client_addr) {
     char buffer[BUF_SIZE];
-
+	char nome[BUF_SIZE];
     char request[] = "LOGIN {username} {password}\n"; //mensagem de aviso para fazer o login
     write(client_fd, request, strlen(request));
     int client_logado = 0;
@@ -91,6 +91,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
             login_user(arg1, arg2, &client_logado);
 
             if(client_logado > 1) { //mensagem de ter conseguido logar
+				strcpy(nome,arg1);
                 if (write(client_fd, "OK!\n", strlen("OK!\n")) < 0) perror("Erro ao enviar resposta TCP");
             }
             else { //mensagem de não ter conseguido logar
@@ -105,8 +106,8 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
                 list_subscribed(client_fd, arg1);
             } 
             else if (strcmp(comando, "SUBSCRIBE_CLASS") == 0) {
-				//SUBSCRIBE_CLASS <name>
-                subscribe_class(client_fd,arg1,arg2); 
+				//SUBSCRIBE_CLASS <name> 
+                subscribe_class(client_fd,nome,arg1); 
             } 
             else if (strcmp(comando, "DISCONNECT") == 0) { 
                 escrever_ficheiro();
@@ -138,7 +139,7 @@ void list_classes(int client_fd, const char *nome) {
 	int existe = 0;
 	sem_wait(sem_alunos);
     for (int i = 0; i < MAX_CLASSES; i++) {
-        if ((share->aulas[i].name[0] != '\0') && (is_user_in_class(nome, share->aulas[i].name) == 0)) { // Apenas listamos classes que tenham um nome definido (não vazias)
+        if ((share->aulas[i].name[0] != '\0') ){ // Apenas listamos classes que tenham um nome definido (não vazias)
             int num_students = 0;
             for (int j = 0; j < MAX_USERS_CLASS; j++) {
                 if (share->aulas[i].alunos_turma[j].username[0] != '\0') {
@@ -154,10 +155,12 @@ void list_classes(int client_fd, const char *nome) {
         }
 		
 	}
-	sem_post(sem_alunos);
+
 	if (!existe){
 		send(client_fd, "Não existem classes", strlen("Não existem classes"), 0);
 	}
+	sem_post(sem_alunos);
+	
 }
 
 void list_subscribed(int client_fd, const char *nome) {
@@ -301,7 +304,6 @@ void udp_server_function(unsigned short udp_port) {
         sscanf(buf, "%s %s %s %s", comando, arg1, arg2, arg3);
 		if (strcmp(buf, "X") != 0 && strlen(buf) != 1) {
 			if (strcmp(comando, "LOGIN") == 0) {
-				printf("ANALISAR O LOGIN\n");
 				login_user(arg1, arg2, &admin_logado);
 
 				if(admin_logado == 1){//mensagem de ter conseguido logar
@@ -315,11 +317,13 @@ void udp_server_function(unsigned short udp_port) {
 			else if (admin_logado == 1) {
 				if (strcmp(comando, "ADD_USER") == 0) {
 
-					if (add_user(arg1, arg2, arg3)) {
+					if (add_user(arg1, arg2, arg3)==1) {
 						sendto(udp_fd, "Utilizador adicionado com sucesso.\n", strlen("Utilizador adicionado com sucesso.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
-					} else {
+					} else if(add_user(arg1, arg2, arg3)==0){
 						sendto(udp_fd, "Cargo nao existente.\n", strlen("Cargo nao existente.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
 					}
+					else
+						sendto(udp_fd, "Já existe esse username.\n", strlen("Já existe esse username.\n"), 0, (struct sockaddr*)&client_addr, addrlen);
 				} 
 				else if (strcmp(comando, "DEL") == 0) {
 					if (remove_utilizador(arg1)) {
@@ -392,14 +396,20 @@ int add_user(const char *name, const char *pass, const char *ro) {  			// admin 
     char aux[TAM];
     strcpy(aux, ro);
 
-    if (verifica_func(ro)) { //Verifica se o terceiro parametro é leitor, admin ou jornalista
-        strcpy(person.username, name); //Guarda as 3 strings nos seus respetivos lugares na struct
-        strcpy(person.password, pass);
-        strcpy(person.role, ro);
-        insere_utilizador(person); //Adiciona-se essa struct à lista
-    } else {
-		result=0;
-    }
+	if(verifica_nome(name)){
+		if (verifica_func(ro)) { //Verifica se o terceiro parametro é leitor, admin ou jornalista
+			strcpy(person.username, name); //Guarda as 3 strings nos seus respetivos lugares na struct
+			strcpy(person.password, pass);
+			strcpy(person.role, ro);
+			insere_utilizador(person); //Adiciona-se essa struct à lista
+		} else {
+			result=0;
+		}
+	}
+	else{
+		result=2;
+	}
+
 	return result;
 }
 
@@ -411,6 +421,15 @@ int verifica_func(const char aux[TAM]){																// verifica se estamos a 
     }
 
     return count;
+}
+
+int verifica_nome(const char aux[TAM]){
+	for (int j = 0; j < MAX_USERS; j++) {
+        if (strcmp(share->users[j].username, aux) == 0) {
+			return 0;  // Já existe com esse nome
+		}
+	}
+	return 1;
 }
 
 
