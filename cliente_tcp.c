@@ -72,6 +72,7 @@ int main(int argc, char *argv[]) {
 
 		// Usando sscanf para extrair o endereço dentro dos sinais de menor e maior
 		if (sscanf(mensagem, "Utilizador adicionado à turma com sucesso.\nEndereço Multicast: <%49[^>]>%*s", endereco) == 1) {
+			printf("GOING TO JOIN MULTICAST\n");
 			join_multicast(endereco, atoi(argv[2]));
 		}
 		} else {
@@ -146,6 +147,7 @@ void join_multicast(const char *multicast, int port){
 }
 
 void listen_class(void* arg){
+	printf("STARTING TO LISTEN\n");
     int socket = *(int*)arg;
 
     while (1) {

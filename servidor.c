@@ -131,7 +131,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
                 break;
             }
             else if (strcmp(comando, "CREATE_CLASS") == 0 && client_logado == 3) {
-                create_class(client_fd, arg1, arg2);
+                create_class(client_fd, arg1, arg2, nome);
             }
             else if (strcmp(comando, "SEND") == 0 && client_logado == 3) { //não funciona
 				//SEND name text
@@ -230,7 +230,7 @@ int subscribe_class(int client_fd,const char *username, const char *class_name){
     return 0;  // Turma não encontrada
 }
 
-int create_class(int  client_fd, const char *class_name, const char *max_alunos_str) {
+int create_class(int  client_fd, const char *class_name, const char *max_alunos_str, const char *prof) {
 	int id;
     int max_alunos = atoi(max_alunos_str); // Converte a string do tamanho máximo para um inteiro
     if (max_alunos < 1 || max_alunos > MAX_USERS_CLASS) {
@@ -246,6 +246,7 @@ int create_class(int  client_fd, const char *class_name, const char *max_alunos_
             share->aulas[i].name[TAM - 1] = '\0'; // Garante que a string seja terminada corretamente
             share->aulas[i].max_alunos = max_alunos; // Define o número máximo de alunos
             memset(share->aulas[i].alunos_turma, 0, sizeof(share->aulas[i].alunos_turma)); // Inicializa a lista de alunos
+			strcpy(share->aulas[i].prof,prof);
 
 			//set the multicast base address
 			struct in_addr multicast_base = { htonl(0xEF000000) };
@@ -284,6 +285,7 @@ void send_cont(int client_fd, const char *class_name,const char *message, int mu
 				write(client_fd, "Mensagem enviada!\n", strlen("Mensagem enviada!\n"));
 				return;
 			}else{
+				printf("Nome prof: %s\nNome que supostamente é:%s\n", nome,share->aulas->prof);
 				write(client_fd, "Não é o professor regente desta aula!\n", strlen("Não é o professor regente desta aula!\n"));
 				return;
 			}

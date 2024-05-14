@@ -49,7 +49,7 @@ typedef struct classes {
 	char multicast[TAM];
 	int max_alunos;
 	utilizador alunos_turma[MAX_USERS_CLASS];
-	char prof;
+	char prof[BUF_SIZE];
 }classes;
 
 sem_t * sem_utilizadores;
@@ -73,7 +73,7 @@ void udp_server_function(unsigned short udp_port);
 void list_classes(int client_fd, const char *nome);
 void list_subscribed(int client_fd, const char *nome);
 int subscribe_class(int client_fd,const char *username, const char *class_name);
-int create_class(int  client_fd, const char *class_name, const char *max_alunos_str);
+int create_class(int  client_fd, const char *class_name, const char *max_alunos_str, const char *prof);
 void send_cont(int client_fd, const char *class_name,const char *message, int multicast_socket, struct sockaddr_in multicast_addr,const char *nome);
 int is_user_in_class(const char *username, const char *class_name);
 int add_user(const char *name, const char *pass, const char *ro);
