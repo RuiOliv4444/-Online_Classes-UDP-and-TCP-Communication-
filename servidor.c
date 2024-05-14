@@ -79,11 +79,11 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 	multicast_addr.sin_port = htons(MULTICAST_PORT);
 
 	if((multicast_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-		error("Error creating socket for multicast group");
+		perror("Error creating socket for multicast group");
 
 	int mreq = 2; //increase packet life time
 	if(setsockopt(multicast_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
-		error("Error enabling multicast on socket");
+		perror("Error enabling multicast on socket");
 
 
 
@@ -254,7 +254,7 @@ int create_class(int  client_fd, const char *class_name, const char *max_alunos_
 			//convert the multicast address to a string
 			char multicast_addr_str[INET_ADDRSTRLEN];
 			if(inet_ntop(AF_INET, &multicast_base, multicast_addr_str, sizeof(multicast_addr_str)) == NULL)
-				error("Error converting multicast address to a string");
+				perror("Error converting multicast address to a string");
 
 			//copying multicast address to respective multicast group struct addr
 			strcpy(share->aulas[i].multicast, multicast_addr_str);
@@ -280,7 +280,7 @@ void send_cont(int client_fd, const char *class_name,const char *message, int mu
 			if(strcmp(nome, share->aulas->prof)==0){
 				multicast_addr.sin_addr.s_addr = inet_addr(share->aulas[i].multicast);
 				if(sendto(multicast_socket, message, strlen(message), 0, (struct sockaddr*)&multicast_addr, sizeof(multicast_addr)) < 0)
-					error("Erro a enviar mensagem para o grupo multicast");
+					perror("Erro a enviar mensagem para o grupo multicast");
 				write(client_fd, "Mensagem enviada!\n", strlen("Mensagem enviada!\n"));
 				return;
 			}else{
