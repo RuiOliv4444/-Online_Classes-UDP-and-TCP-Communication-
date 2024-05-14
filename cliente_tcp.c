@@ -65,19 +65,16 @@ int main(int argc, char *argv[]) {
     bzero(buffer, 1024);
     int bytes_read = read(fd, buffer, 1023);// ler a mensagem eviado pelo server, que pode ser a de boas vindas, informação sobre o dominio, ou mensagem de despedida
     if (bytes_read <= 0) break;
-
 	if(i==1){
 		char *resultado = strstr(buffer, "Utilizador adicionado à turma com sucesso");
 		if (resultado != NULL) {
 			char endereco[50];  // Array para armazenar o endereço extraído
 
-		// Usando sscanf para extrair o endereço dentro dos sinais de menor e maior
-		if (sscanf(mensagem, "Utilizador adicionado à turma com sucesso.\nEndereço Multicast: <%49[^>]>%*s", endereco) == 1) {
-			printf("GOING TO JOIN MULTICAST\n");
-			join_multicast(endereco, atoi(argv[2]));
-		}
-		} else {
-
+			// Usando sscanf para extrair o endereço dentro dos sinais de menor e maior
+			if (sscanf(buffer, "Utilizador adicionado à turma com sucesso.\nEndereço Multicast: <%49[^>]>%*s", endereco) == 1) {
+				printf("GOING TO JOIN MULTICAST\n");
+				join_multicast(endereco, atoi(argv[2]));
+			}
 		}
 	}
 
@@ -92,10 +89,8 @@ int main(int argc, char *argv[]) {
     }
 	char *resultado = strstr(mensagem, "SUBSCRIBE_CLASS");
     if (resultado != NULL) {
-		printf("DENTRO 1\n");
 		i=1;
     } else {
-		printf("DENTRO 2\n");
 		i=0;
     }
   }
