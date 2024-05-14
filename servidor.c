@@ -81,8 +81,8 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 	if((multicast_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
 		perror("Error creating socket for multicast group");
 
-	int mreq = 2; //increase packet life time
-	if(setsockopt(multicast_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
+	int ttl_value = 2; //increase packet life time
+	if(setsockopt(multicast_socket, IPPROTO_IP, IP_MULTICAST_TTL, &ttl_value, sizeof(ttl_value)) < 0)
 		perror("Error enabling multicast on socket");
 
 
