@@ -214,13 +214,13 @@ int subscribe_class(int client_fd,const char *username, const char *class_name){
                     strncpy(share->aulas[i].alunos_turma[j].username, username, TAM);
 					sem_post(sem_alunos);
 					char mensagem[BUF_SIZE];
-					snprintf(mensagem,sizeof(mensagem),"Utilizador adicionado à turma com sucesso.\nEndereço Multicast: <%s>\n",share->aulas[i].multicast);
+					snprintf(mensagem,sizeof(mensagem),"ACCEPTED <%s>\n",share->aulas[i].multicast);
 					send(client_fd,mensagem, strlen(mensagem), 0);
                     return 1;  // Sucesso ao adicionar o utilizador
                 }
             }
 			sem_post(sem_alunos);
-			send(client_fd, "A turma já se encontra cheia.\n", strlen("A turma já se encontra cheia.\n"), 0);
+			send(client_fd, "REJECTED\n", strlen("REJECTED\n"), 0);
             return 3;  // Turma cheia
         }
     }
@@ -285,7 +285,6 @@ void send_cont(int client_fd, const char *class_name,const char *message, int mu
 				write(client_fd, "Mensagem enviada!\n", strlen("Mensagem enviada!\n"));
 				return;
 			}else{
-				printf("Nome prof: %s\nNome que supostamente é:%s\n", nome,share->aulas->prof);
 				write(client_fd, "Não é o professor regente desta aula!\n", strlen("Não é o professor regente desta aula!\n"));
 				return;
 			}

@@ -15,13 +15,13 @@
 #define MAX_CLASSES_PER_USER 10
 
 void erro(char *msg);
-void join_multicast(const char *multicast, int port);
-void *listen_class(void* arg);
-void sigint_handler();
+void join_multicast(char multicast[], int port);
 void close_connections();
+void* listen_class(void* arg);
+void sigint_handler();
 
 int fd;
-int class=0;
+int classe=0;
 int sockets[MAX_CLASSES_PER_USER];
 struct ip_mreq mreqs[MAX_CLASSES_PER_USER];
 char groups[MAX_CLASSES_PER_USER][16];
@@ -65,19 +65,18 @@ int main(int argc, char *argv[]) {
     bzero(buffer, 1024);
     int bytes_read = read(fd, buffer, 1023);// ler a mensagem eviado pelo server, que pode ser a de boas vindas, informação sobre o dominio, ou mensagem de despedida
     if (bytes_read <= 0) break;
-
 	if(i==1){
-		char *resultado = strstr(buffer, "Utilizador adicionado à turma com sucesso");
+		char *resultado = strstr(buffer, "ACCEPTED");
 		if (resultado != NULL) {
 			char endereco[50];  // Array para armazenar o endereço extraído
 
-		// Usando sscanf para extrair o endereço dentro dos sinais de menor e maior
-		if (sscanf(mensagem, "Utilizador adicionado à turma com sucesso.\nEndereço Multicast: <%49[^>]>%*s", endereco) == 1) {
-			printf("GOING TO JOIN MULTICAST\n");
-			join_multicast(endereco, atoi(argv[2]));
-		}
-		} else {
-
+			// Usando sscanf para extrair o endereço dentro dos sinais de menor e maior
+			if (sscanf(buffer, "ACCEPTED <%49[^>]>%*s", endereco) == 1) {
+				endereco[strlen(endereco)]= '\0';
+				printf("GOING TO JOIN MULTICAST\n");
+				printf("ENDEREÇO: %s\n",endereco);
+				join_multicast(endereco, atoi(argv[2]));
+			}
 		}
 	}
 
@@ -102,19 +101,19 @@ int main(int argc, char *argv[]) {
   exit(0);
 }
 
-void join_multicast(const char *multicast, int port){
+void join_multicast(char multicast[], int port){
 	struct sockaddr_in addr;
     struct ip_mreq mreq;
 
     //create socket
-    if ((sockets[class] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    if ((sockets[classe] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("socket");
         exit(1);
     }
 
     //reuse port
     int optval = 1;
-    setsockopt(sockets[class], SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    setsockopt(sockets[classe], SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
 
     //bind to all local interfaces
     memset(&addr, 0, sizeof(addr));
@@ -122,7 +121,7 @@ void join_multicast(const char *multicast, int port){
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
     addr.sin_port = htons(MULTICAST_PORT);
 
-    if (bind(sockets[class], (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+    if (bind(sockets[classe], (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("bind");
         exit(1);
     }
@@ -131,32 +130,33 @@ void join_multicast(const char *multicast, int port){
     mreq.imr_multiaddr.s_addr = inet_addr(multicast);
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 
-    if (setsockopt(sockets[class], IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+    if (setsockopt(sockets[classe], IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
         perror("setsockopt");
     }
 
     //add to mreq struct array
-    mreqs[class-0] = mreq;
+    mreqs[classe-0] = mreq;
 
     //start listening thread
     pthread_t thread;
-    pthread_create(&thread, NULL, listen_class, &sockets[class]);
+    pthread_create(&thread, NULL, listen_class, &sockets[classe]);
 
     //add to groups array
-    strncpy(groups[class], multicast, sizeof(groups[class]));
-    class++;
+    strncpy(groups[classe], multicast, sizeof(groups[classe]));
+    classe++;
 }
 
-void *listen_class(void* arg){
+void* listen_class(void* arg){
 	printf("STARTING TO LISTEN\n");
     int socket = *(int*)arg;
 
     while (1) {
         char buf[BUF_SIZE];
         struct sockaddr_in addr;
-        socklen_t addrlen = sizeof(addr);
+        int addrlen = sizeof(addr);
+		printf("WAITING....\n");
         int n = recvfrom(socket, buf, sizeof(buf), 0, (struct sockaddr *)&addr, &addrlen);
- 
+		printf("DID IT\n");
         if (n < 0) {
             perror("recvfrom");
             exit(1);
@@ -166,6 +166,8 @@ void *listen_class(void* arg){
         printf("Received message from class: %s\n->", buf);
         fflush(stdout);
     }
+
+	return NULL;
 }
 
 
@@ -182,7 +184,7 @@ void sigint_handler(){
 }
 
 void close_connections(){
-    for(int i=0; i<class; i++){
+    for(int i=0; i<classe; i++){
         if (setsockopt(sockets[i], IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreqs[i], sizeof(mreqs[i])) < 0) {
             perror("setsockopt");
             exit(1);

@@ -30,7 +30,7 @@
 #define MAX_CLASSES 100
 #define MAX_USERS_CLASS 50
 #define TAM 30 
-#define MULTICAST_PORT 8888
+#define MULTICAST_PORT 5000
 
 FILE *file;
 char *filename;
