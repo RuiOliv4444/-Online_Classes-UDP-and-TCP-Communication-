@@ -4,8 +4,6 @@
 
 int main(int argc, char *argv[]) {
 
-	signal(SIGINT, treat_signal);
-
 	unsigned short tcp_port = htons(atoi(argv[1]));
     unsigned short udp_port = htons(atoi(argv[2]));
 	filename = malloc(strlen(argv[3]) + 1);
@@ -84,8 +82,6 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 	int ttl_value = 2; //increase packet life time
 	if(setsockopt(multicast_socket, IPPROTO_IP, IP_MULTICAST_TTL, &ttl_value, sizeof(ttl_value)) < 0)
 		perror("Error enabling multicast on socket");
-
-
 
     char buffer[BUF_SIZE];
 	char nome[BUF_SIZE];
@@ -192,7 +188,7 @@ void list_subscribed(int client_fd, const char *nome) {
 		}
 	}
 	sem_post(sem_alunos);
-	if(cont==0)	send(client_fd, "O utilizador não está inscrito em nenhuma aula.\n", strlen( "O utilizador não está inscrito em nennhuma aula.\n"), 0);
+	if(cont==0)	send(client_fd, "O utilizador não está inscrito em nenhuma classe.\n", strlen( "O utilizador não está inscrito em nennhuma classe.\n"), 0);
 
 }
 
@@ -204,7 +200,7 @@ int subscribe_class(int client_fd,const char *username, const char *class_name){
             for (int j = 0; j < MAX_USERS_CLASS; j++) {
                 if (strcmp(share->aulas[i].alunos_turma[j].username, username) == 0) {
 					sem_post(sem_alunos);
-					send(client_fd, "O utilizador já está inscrito nessa turma.\n", strlen("O utilizador já está inscrito nessa turma.\n"), 0);
+					send(client_fd, "O utilizador já está inscrito nessa class.\n", strlen("O utilizador já está inscrito nessa class.\n"), 0);
                     return 2;  // Utilizador já está matriculado na turma
                 }
             }
@@ -225,7 +221,7 @@ int subscribe_class(int client_fd,const char *username, const char *class_name){
         }
     }
 	sem_post(sem_alunos);
-	send(client_fd, "Turma não encontrada.\n", strlen("Turma não encontrada.\n"), 0);
+	send(client_fd, "Class não encontrada.\n", strlen("Turma não encontrada.\n"), 0);
     return 0;  // Turma não encontrada
 }
 
@@ -388,12 +384,15 @@ void udp_server_function(unsigned short udp_port) {
 					escrever_ficheiro();
 					printf("Servidor UDP encerrando...\n");
 					fflush(stdout);
+
 					kill(p_tcp, SIGTERM);
                     waitpid(p_tcp, NULL, 0); // Espera o filho terminar
+
 					sem_close(sem_alunos);
 					sem_close(sem_utilizadores);
 					sem_unlink("utilizadores");
 					sem_unlink("alunos");
+
 					if (shmdt(share) == -1) {
 						perror("ERROR IN shmdt");
 					}
@@ -549,6 +548,7 @@ void ler_ficheiro() {
 }
 
 void escrever_ficheiro() {
+	printf("ESTOU");
     FILE *file = fopen(filename, "w");
     if (file == NULL) {
         perror("Erro ao abrir o ficheiro para escrita.");
@@ -563,25 +563,10 @@ void escrever_ficheiro() {
 }
 
 void treat_signal(int sig){
-	escrever_ficheiro();
-    if (p_tcp != 0) {
-        kill(p_tcp, SIGTERM);
-        waitpid(p_tcp, NULL, 0);
-    }
+	close(tcp_fd);
+   	while(wait(NULL)>0);
 	
-	sem_close(sem_alunos);
-	sem_close(sem_utilizadores);
-	sem_unlink("utilizadores");
-	sem_unlink("alunos");
-	if (shmdt(share) == -1) {
-		perror("ERROR IN shmdt");
-	}
-	if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
-		perror("ERROR IN shmctl");
-	}
-    printf("Servidor encerrado.\n");
-	free(file);
-    exit(0);
+	exit(0);
 }
 
 void erro(char *msg) {

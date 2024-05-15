@@ -15,7 +15,7 @@
 #define MAX_CLASSES_PER_USER 10
 
 void erro(char *msg);
-void join_multicast(char multicast[], int port);
+void join_class(char multicast[], int port);
 void close_connections();
 void* listen_class(void* arg);
 void sigint_handler();
@@ -56,9 +56,9 @@ int main(int argc, char *argv[]) {
   addr.sin_port = htons((short) atoi(argv[2]));							
 
   if ((fd = socket(AF_INET,SOCK_STREAM,0)) == -1)						
-    erro("socket");
+    erro("Erro no socket");
   if (connect(fd,(struct sockaddr *)&addr,sizeof (addr)) < 0)			
-    erro("Connect");
+    erro("Connectado");
 
 	int i = 0;
   while (1) { //ciclo infinito para estar sempre a ler e a responder ás mensagens do servidor até ordem contrária
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
 				endereco[strlen(endereco)]= '\0';
 				printf("GOING TO JOIN MULTICAST\n");
 				printf("ENDEREÇO: %s\n",endereco);
-				join_multicast(endereco, atoi(argv[2]));
+				join_class(endereco, atoi(argv[2]));
 			}
 		}
 	}
@@ -101,19 +101,19 @@ int main(int argc, char *argv[]) {
   exit(0);
 }
 
-void join_multicast(char multicast[], int port){
+void join_class(char multicast[], int port){
 	struct sockaddr_in addr;
     struct ip_mreq mreq;
 
     //create socket
     if ((sockets[classe] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("socket");
+        perror("Erro no socket");
         exit(1);
     }
 
     //reuse port
-    int optval = 1;
-    setsockopt(sockets[classe], SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    int pt = 1;
+    setsockopt(sockets[classe], SOL_SOCKET, SO_REUSEADDR, &pt, sizeof(pt));
 
     //bind to all local interfaces
     memset(&addr, 0, sizeof(addr));
@@ -122,7 +122,7 @@ void join_multicast(char multicast[], int port){
     addr.sin_port = htons(MULTICAST_PORT);
 
     if (bind(sockets[classe], (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        perror("bind");
+        perror("Erro no bind");
         exit(1);
     }
 
@@ -156,9 +156,8 @@ void* listen_class(void* arg){
         int addrlen = sizeof(addr);
 		printf("WAITING....\n");
         int n = recvfrom(socket, buf, sizeof(buf), 0, (struct sockaddr *)&addr, &addrlen);
-		printf("DID IT\n");
         if (n < 0) {
-            perror("recvfrom");
+            perror("Erro no recvfrom");
             exit(1);
         }
 
@@ -186,7 +185,7 @@ void sigint_handler(){
 void close_connections(){
     for(int i=0; i<classe; i++){
         if (setsockopt(sockets[i], IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreqs[i], sizeof(mreqs[i])) < 0) {
-            perror("setsockopt");
+            perror("Erro no setsockopt");
             exit(1);
         }
         close(sockets[i]);
