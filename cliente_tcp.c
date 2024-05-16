@@ -140,7 +140,7 @@ void join_class(char multicast[], int port){
     }
 
     //add to mreq struct array
-    mreqs[classe-0] = mreq;
+    mreqs[classe] = mreq;
 
     //start listening thread
     pthread_t thread;

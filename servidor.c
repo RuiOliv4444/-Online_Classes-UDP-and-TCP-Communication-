@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
 		tcp_addr.sin_port = tcp_port;
 	    tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
 		
-		if (setsockopt(tcp_fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) error("setsockopt(SO_REUSEADDR) failed"); //allow reuse of local addresses (stops binding error)
+		if (setsockopt(tcp_fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) erro("setsockopt(SO_REUSEADDR) failed"); //allow reuse of local addresses (stops binding error)
 
 		if (bind(tcp_fd, (struct sockaddr*)&tcp_addr, sizeof(tcp_addr)) < 0)
 			erro("Erro no bind do socket TCP");
@@ -114,7 +114,6 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
                 list_subscribed(client_fd,nome);
             } 
             else if (strcmp(comando, "SUBSCRIBE_CLASS") == 0) {
-				//SUBSCRIBE_CLASS <name> verificar argumentos
                 subscribe_class(client_fd,nome,arg1); 
             } 
             else if (strcmp(comando, "DISCONNECT") == 0) { //não funciona
@@ -125,7 +124,6 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
                 create_class(client_fd, arg1, arg2, nome);
             }
             else if (strcmp(comando, "SEND") == 0 && client_logado == 3) { //não funciona
-				//SEND name text
                 send_cont(client_fd, arg1, arg2, multicast_socket, multicast_addr, nome);
             }
             else {
@@ -458,6 +456,7 @@ int add_user(const char *name, const char *pass, const char *ro) {  			// admin 
 			strcpy(person.username, name); //Guarda as 3 strings nos seus respetivos lugares na struct
 			strcpy(person.password, pass);
 			strcpy(person.role, ro);
+			person.logged = false;
 			insere_utilizador(person); //Adiciona-se essa struct à lista
 		} else {
 			result=0;
