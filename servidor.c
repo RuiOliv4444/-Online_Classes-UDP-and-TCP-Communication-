@@ -1,25 +1,22 @@
 #include "servidor.h"
-#include <stdlib.h>
-#include <string.h>
 
 int main(int argc, char *argv[]) {
+	sem_unlink("utilizadores");
+	sem_unlink("alunos");
+	sem_utilizadores = sem_open("utilizadores", O_CREAT|O_EXCL, 0777,1);
+	sem_alunos = sem_open("alunos", O_CREAT|O_EXCL, 0777,1);
 
 	unsigned short tcp_port = htons(atoi(argv[1]));
     unsigned short udp_port = htons(atoi(argv[2]));
 	filename = malloc(strlen(argv[3]) + 1);
     strcpy(filename, argv[3]);
-	//
+
 	create_shared();
 
-	//
 	init_shared_struct(share);
 
 	ler_ficheiro();
 
-	sem_unlink("utilizadores");
-	sem_unlink("alunos");
-	sem_utilizadores = sem_open("utilizadores", O_CREAT|O_EXCL, 0777,1);
-	sem_alunos = sem_open("alunos", O_CREAT|O_EXCL, 0777,1);
 	p_tcp = fork();
     if (p_tcp == 0) { // Cria um processo filho para o servidor TCP
 		struct sockaddr_in tcp_addr;
@@ -34,6 +31,7 @@ int main(int argc, char *argv[]) {
 		tcp_addr.sin_port = tcp_port;
 	    tcp_fd = socket(AF_INET, SOCK_STREAM, 0);
 		
+		if (setsockopt(tcp_fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) error("setsockopt(SO_REUSEADDR) failed"); //allow reuse of local addresses (stops binding error)
 
 		if (bind(tcp_fd, (struct sockaddr*)&tcp_addr, sizeof(tcp_addr)) < 0)
 			erro("Erro no bind do socket TCP");
@@ -43,8 +41,6 @@ int main(int argc, char *argv[]) {
 
 		int client;
 		client_addr_size = sizeof(tcp_addr);
-
-
 
 		while (1) {
 			client = accept(tcp_fd, (struct sockaddr *)&tcp_addr, &client_addr_size);
