@@ -20,7 +20,7 @@
 #define MAX_CLASSES_PER_USER 10
 
 void erro(char *msg);
-void join_class(char multicast[], int port);
+void join_class(char multicast[]);
 void close_connections();
 void* listen_class(void* arg);
 void sigint_handler();
@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
 				endereco[strlen(endereco)]= '\0';
 				printf("GOING TO JOIN MULTICAST\n");
 				printf("ENDEREÇO: %s\n",endereco);
-				join_class(endereco, atoi(argv[2]));
+				join_class(endereco);
 			}
 		}
 	}
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
   exit(0);
 }
 
-void join_class(char multicast[], int port){
+void join_class(char multicast[]){
 	struct sockaddr_in addr;
     struct ip_mreq mreq;
 
@@ -117,8 +117,8 @@ void join_class(char multicast[], int port){
     }
 
     //reuse port
-    int pt = 1;
-    setsockopt(sockets[classe], SOL_SOCKET, SO_REUSEADDR, &pt, sizeof(pt));
+    int opt = 1;
+    setsockopt(sockets[classe], SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
     //bind to all local interfaces
     memset(&addr, 0, sizeof(addr));
@@ -139,14 +139,13 @@ void join_class(char multicast[], int port){
         perror("setsockopt");
     }
 
-    //add to mreq struct array
     mreqs[classe] = mreq;
 
-    //start listening thread
+	//thread que vai ler as mensagens do multicast
     pthread_t thread;
     pthread_create(&thread, NULL, listen_class, &sockets[classe]);
 
-    //add to groups array
+
     strncpy(groups[classe], multicast, sizeof(groups[classe]));
     classe++;
 }
@@ -183,11 +182,11 @@ void erro(char *msg) {
 void sigint_handler(){
     write(fd, "CLOSING", strlen("CLOSING"));
     printf("SIGINT received. Closing multicast sockets...\n");
-    close_connections();
+    close();
     exit(0);
 }
 
-void close_connections(){
+void close(){
     for(int i=0; i<classe; i++){
         if (setsockopt(sockets[i], IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreqs[i], sizeof(mreqs[i])) < 0) {
             perror("Erro no setsockopt");

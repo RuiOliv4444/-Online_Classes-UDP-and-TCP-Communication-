@@ -75,7 +75,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 	if((multicast_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
 		perror("Error creating socket for multicast group");
 
-	int ttl_value = 2; //increase packet life time
+	int ttl_value = 128; //increase packet life time
 	if(setsockopt(multicast_socket, IPPROTO_IP, IP_MULTICAST_TTL, &ttl_value, sizeof(ttl_value)) < 0)
 		perror("Error enabling multicast on socket");
 
@@ -237,16 +237,16 @@ int create_class(int  client_fd, const char *class_name, const char *max_alunos_
             memset(share->aulas[i].alunos_turma, 0, sizeof(share->aulas[i].alunos_turma)); // Inicializa a lista de alunos
 			strcpy(share->aulas[i].prof,prof);
 
-			//set the multicast base address
+			//definir o endereço base para o multicast
 			struct in_addr multicast_base = { htonl(0xEF000000) };
-			//add the group id to the base address
+			//somar ao endereço o numero da turma
 			multicast_base.s_addr = htonl(ntohl(multicast_base.s_addr) + id);
-			//convert the multicast address to a string
+			//converter endereço multicast para string
 			char multicast_addr_str[INET_ADDRSTRLEN];
 			if(inet_ntop(AF_INET, &multicast_base, multicast_addr_str, sizeof(multicast_addr_str)) == NULL)
 				perror("Error converting multicast address to a string");
 
-			//copying multicast address to respective multicast group struct addr
+			//guardar o multicaste na shared
 			strcpy(share->aulas[i].multicast, multicast_addr_str);
 			sem_post(sem_alunos);
 			snprintf(mensagem,sizeof(mensagem),"OK <%s>\n",share->aulas[i].multicast);
@@ -421,7 +421,7 @@ void udp_server_function(unsigned short udp_port) {
 void login_user(const char *username, const char *password, int *login) {
     *login = 0; 
     for (int i = 0; i < MAX_USERS; i++) {
-        if (share->users[i].username[0] != '\0' && strcmp(username, share->users[i].username) == 0 && strcmp(password, share->users[i].password) == 0 && (!share->users[i].logged)) {
+        if (share->users[i].username[0] != '\0' && strcmp(username, share->users[i].username) == 0 && strcmp(password, share->users[i].password) == 0 && (share->users[i].logged == false)) {
             
             if (strcmp(share->users[i].role, "administrador") == 0) {
 				share->users[i].logged = true;
