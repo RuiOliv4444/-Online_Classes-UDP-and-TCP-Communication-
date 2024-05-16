@@ -10,6 +10,7 @@ int main(int argc, char *argv[]) {
     strcpy(filename, argv[3]);
 	//
 	create_shared();
+
 	//
 	init_shared_struct(share);
 
@@ -19,7 +20,6 @@ int main(int argc, char *argv[]) {
 	sem_unlink("alunos");
 	sem_utilizadores = sem_open("utilizadores", O_CREAT|O_EXCL, 0777,1);
 	sem_alunos = sem_open("alunos", O_CREAT|O_EXCL, 0777,1);
-
 	p_tcp = fork();
     if (p_tcp == 0) { // Cria um processo filho para o servidor TCP
 		struct sockaddr_in tcp_addr;
@@ -123,7 +123,6 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
             } 
             else if (strcmp(comando, "DISCONNECT") == 0) { //não funciona
                 escrever_ficheiro();
-                close(client_fd);
                 break;
             }
             else if (strcmp(comando, "CREATE_CLASS") == 0 && client_logado == 3) {
@@ -142,6 +141,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
             if (write(client_fd, "É necessário efetuar login primeiro!\n", strlen("É necessário efetuar login primeiro!\n")) < 0) perror("Erro ao enviar resposta TCP");
         }
     }
+	close(client_fd);
     exit(0);
 }
 
@@ -427,19 +427,20 @@ void udp_server_function(unsigned short udp_port) {
 void login_user(const char *username, const char *password, int *login) {
     *login = 0; 
     for (int i = 0; i < MAX_USERS; i++) {
-        if (share->users[i].username[0] != '\0' &&  // Checa se o usuário está ativo
-            strcmp(username, share->users[i].username) == 0 && 
-            strcmp(password, share->users[i].password) == 0) {
+        if (share->users[i].username[0] != '\0' && strcmp(username, share->users[i].username) == 0 && strcmp(password, share->users[i].password) == 0 && (!share->users[i].logged)) {
             
             if (strcmp(share->users[i].role, "administrador") == 0) {
+				share->users[i].logged = true;
                 *login = 1; // Sucesso no login como administrador
 				sem_post(sem_utilizadores);
                 return;
             } else if (strcmp(share->users[i].role, "aluno") == 0) {
+				share->users[i].logged = true;
                 *login = 2; // Sucesso no login como aluno
 				sem_post(sem_utilizadores);
                 return;
             } else if (strcmp(share->users[i].role, "professor") == 0) {
+				share->users[i].logged = true;
                 *login = 3; // Sucesso no login como professor
 				sem_post(sem_utilizadores);
                 return;
@@ -548,17 +549,19 @@ void ler_ficheiro() {
 }
 
 void escrever_ficheiro() {
-	printf("ESTOU");
+
     FILE *file = fopen(filename, "w");
     if (file == NULL) {
         perror("Erro ao abrir o ficheiro para escrita.");
         return;
     }
+	sem_wait(sem_alunos);
     for (int i = 0; i < MAX_USERS; i++) {
         if (share->users[i].username[0] != '\0') {  // Checa se o nome de usuário não está vazio
             fprintf(file, "%s;%s;%s\n", share->users[i].username, share->users[i].password, share->users[i].role);
         }
     }
+	sem_post(sem_alunos);
     fclose(file);
 }
 
@@ -600,6 +603,7 @@ void init_shared_struct(shared *share) {
         memset(share->users[i].username, 0, TAM);
         memset(share->users[i].password, 0, TAM);
         memset(share->users[i].role, 0, TAM);
+		share->users[i].logged = false;
     }
 
     // Inicializar todas as classes

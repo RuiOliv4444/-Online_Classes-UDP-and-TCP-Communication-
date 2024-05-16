@@ -42,6 +42,7 @@ typedef struct utilizador {
     char username[TAM];
     char password[TAM];
     char role[TAM];
+	bool logged;
 }utilizador;
 
 typedef struct classes {

@@ -10,8 +10,13 @@
 #include <arpa/inet.h>
 #include <signal.h>
 
-#include "servidor.h"
 
+#define BUF_SIZE 512
+#define MAX_USERS 999
+#define MAX_CLASSES 100
+#define MAX_USERS_CLASS 50
+#define TAM 30 
+#define MULTICAST_PORT 5000
 #define MAX_CLASSES_PER_USER 10
 
 void erro(char *msg);
@@ -154,7 +159,7 @@ void* listen_class(void* arg){
         char buf[BUF_SIZE];
         struct sockaddr_in addr;
         int addrlen = sizeof(addr);
-		printf("WAITING....\n");
+
         int n = recvfrom(socket, buf, sizeof(buf), 0, (struct sockaddr *)&addr, &addrlen);
         if (n < 0) {
             perror("Erro no recvfrom");
