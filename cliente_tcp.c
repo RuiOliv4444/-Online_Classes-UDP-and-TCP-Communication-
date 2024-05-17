@@ -21,7 +21,7 @@
 
 void erro(char *msg);
 void join_class(char multicast[]);
-void close_connections();
+void close_con();
 void* listen_class(void* arg);
 void sigint_handler();
 
@@ -92,6 +92,7 @@ int main(int argc, char *argv[]) {
     mensagem[strcspn(mensagem, "\n")] = 0; 
     write(fd, mensagem, strlen(mensagem));
 	if (strncmp(mensagem, "DISCONNECT\n", 11) == 0) {//verificar se o server enviou a mensagem de despedida, se sim, temos de encerrar o programa
+		close_con();
         break;
     }
 	char *resultado = strstr(mensagem, "SUBSCRIBE_CLASS");
@@ -166,7 +167,7 @@ void* listen_class(void* arg){
         }
 
         buf[n] = '\0';
-        printf("Received message from class: %s\n->", buf);
+        printf("Received message from class: \n->%s", buf);
         fflush(stdout);
     }
 
@@ -182,11 +183,11 @@ void erro(char *msg) {
 void sigint_handler(){
     write(fd, "CLOSING", strlen("CLOSING"));
     printf("SIGINT received. Closing multicast sockets...\n");
-    close();
+    close_con();
     exit(0);
 }
 
-void close(){
+void close_con(){
     for(int i=0; i<classe; i++){
         if (setsockopt(sockets[i], IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreqs[i], sizeof(mreqs[i])) < 0) {
             perror("Erro no setsockopt");
