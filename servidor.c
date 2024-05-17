@@ -1,6 +1,11 @@
 #include "servidor.h"
 
 int main(int argc, char *argv[]) {
+
+	if (argc != 4) {
+    printf("server {PORTO_TURMAS} {PORTO_CONFIG} {ficheiro configuração}\n");
+    exit(-1);
+  }
 	sem_unlink("utilizadores");
 	sem_unlink("alunos");
 	sem_utilizadores = sem_open("utilizadores", O_CREAT|O_EXCL, 0777,1);

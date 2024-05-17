@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
   char mensagem[1024];
 
   if (argc != 3) {
-    printf("cliente <host> <class port> \n");
+    printf("cliente {endereço do servidor} {PORTO_TURMAS} \n");
     exit(-1);
   }
 
@@ -79,6 +79,7 @@ int main(int argc, char *argv[]) {
 			if (sscanf(buffer, "ACCEPTED <%49[^>]>%*s", endereco) == 1) {
 				endereco[strlen(endereco)]= '\0';
 				printf("GOING TO JOIN MULTICAST\n");
+				printf("ENDEREÇO: %s\n",endereco);
 				join_class(endereco);
 			}
 		}
