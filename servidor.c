@@ -194,7 +194,7 @@ void list_subscribed(int client_fd, const char *nome) {
 int subscribe_class(int client_fd,const char *username, const char *class_name){
 	sem_wait(sem_alunos);
     for (int i = 0; i < MAX_CLASSES; i++) {
-        if (strcmp(share->aulas[i].name, class_name) == 0) {  // Encontrar a turma pelo nome
+        if (strcmp(share->aulas[i].name, class_name) == 0 && strcmp(share->aulas[i].prof, username)!=0) {  // Encontrar a turma pelo nome e ter a certeza que o professor nao se está a subscrever na sua propria turma
             // Verificar se o utilizador já está matriculado
             for (int j = 0; j < MAX_USERS_CLASS; j++) {
                 if (strcmp(share->aulas[i].alunos_turma[j].username, username) == 0) {
