@@ -93,20 +93,45 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
         bzero(buffer, BUF_SIZE);
         char comando[TAM];
         char arg1[TAM], arg2[TAM];
+		memset(comando, 0, sizeof(comando));
+		memset(arg1, 0, sizeof(arg1));
+		memset(arg2, 0, sizeof(arg2));
+		char *token;
         if (read(client_fd, buffer, BUF_SIZE-1) <= 0) {
             break;
         }
         buffer[strcspn(buffer, "\n")] = 0; // Remove a mudança de linha "\n"
 
-        sscanf(buffer, "%s %s %s", comando, arg1, arg2); // analisar cada um dos parametros enviados pelo admin 
+		token = strtok(buffer, " ");// analisar cada um dos parametros enviados pelo admin 
+		if (token != NULL) {
+			strcpy(comando, token);
+		}
 
+		// extrair o primeiro argumento
+		token = strtok(NULL, " ");
+		if (token != NULL) {
+			strcpy(arg1, token);
+		}
+
+		// extrair o restante da string
+		token = strtok(NULL, "");
+		if (token != NULL) {
+			strcpy(arg2, token);
+		}
         if (strcmp(comando, "LOGIN") == 0) {
             login_user(arg1, arg2, &client_logado);
 
             if(client_logado > 1) { //mensagem de ter conseguido logar
 				strcpy(nome,arg1);
                 if (write(client_fd, "OK!\n", strlen("OK!\n")) < 0) perror("Erro ao enviar resposta TCP");
-            }
+				if(client_logado == 2 ){//aluno
+					if(write(client_fd, "\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n", strlen("COMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n")) < 0) perror("Erro ao enviar resposta TCP");
+					printf("\nSTUDENT %s HAS LOGGED IN!\n",arg1);
+				}if(client_logado == 3 ){//professor
+					printf("\nTEACHER %s HAS LOGGED IN!\n",arg1);
+					if(write(client_fd, "\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n", strlen("COMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n")) < 0) perror("Erro ao enviar resposta TCP");
+				}
+			}
             else { //mensagem de não ter conseguido logar
                 if (write(client_fd, "REJECTED!\n", strlen("REJECTED!\n")) < 0) perror("Erro ao enviar resposta TCP");
             }
@@ -350,6 +375,7 @@ void udp_server_function(unsigned short udp_port) {
 				login_user(arg1, arg2, &admin_logado);
 
 				if(admin_logado == 1){//mensagem de ter conseguido logar
+					printf("\nADMIN %s HAS LOGGED IN!\n",arg1);
 					sendto(udp_fd, "Login efetuado com sucesso!\n", strlen("Login efetuado com sucesso!\n"), 0, (struct sockaddr*) &client_addr, addrlen);
 				}
 
@@ -427,7 +453,6 @@ void login_user(const char *username, const char *password, int *login) {
     *login = 0; 
     for (int i = 0; i < MAX_USERS; i++) {
         if (share->users[i].username[0] != '\0' && strcmp(username, share->users[i].username) == 0 && strcmp(password, share->users[i].password) == 0 && (share->users[i].logged == false)) {
-            
             if (strcmp(share->users[i].role, "administrador") == 0) {
 				share->users[i].logged = true;
                 *login = 1; // Sucesso no login como administrador
