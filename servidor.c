@@ -128,10 +128,10 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
             if(client_logado > 1) { //mensagem de ter conseguido logar
                 if(client_logado == 2 ){//aluno
 					printf("\nSTUDENT %s HAS LOGGED IN!\n",nome);
-                    if(write(client_fd, "OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n", strlen("OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n")) < 0) perror("Erro ao enviar resposta TCP");
+                    if(write(client_fd, "OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> DISCONNECT\n", strlen("OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> DISCONNECT\n")) < 0) perror("Erro ao enviar resposta TCP");
                 }if(client_logado == 3 ){//professor
                     printf("\nTEACHER %s HAS LOGGED IN!\n",nome);
-                    if(write(client_fd, "OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n", strlen("OK!\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n")) < 0) perror("Erro ao enviar resposta TCP");
+                    if(write(client_fd, "OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n-> DISCONNECT\n", strlen("OK!\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n-> DISCONNECT\n")) < 0) perror("Erro ao enviar resposta TCP");
                 }
             }
             else { //mensagem de não ter conseguido logar
