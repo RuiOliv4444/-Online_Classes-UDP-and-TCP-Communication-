@@ -1,11 +1,10 @@
 #include "servidor.h"
 
 int main(int argc, char *argv[]) {
-
 	if (argc != 4) {
     printf("server {PORTO_TURMAS} {PORTO_CONFIG} {ficheiro configuração}\n");
     exit(-1);
-  }
+	}
 	sem_unlink("utilizadores");
 	sem_unlink("alunos");
 	sem_utilizadores = sem_open("utilizadores", O_CREAT|O_EXCL, 0777,1);
@@ -17,10 +16,12 @@ int main(int argc, char *argv[]) {
     strcpy(filename, argv[3]);
 
 	create_shared();
-
+		
 	init_shared_struct(share);
 
 	ler_ficheiro();
+
+	
 
 	p_tcp = fork();
     if (p_tcp == 0) { // Cria um processo filho para o servidor TCP
@@ -70,7 +71,7 @@ int main(int argc, char *argv[]) {
 
 
 void process_client(int client_fd, struct sockaddr_in client_addr) {
-
+	signal(SIGINT, treat_signal);
 	int multicast_socket; //multicast socket
 	struct sockaddr_in multicast_addr;
 	memset(&multicast_addr, 0, sizeof(multicast_addr));
@@ -146,14 +147,22 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
             else if (strcmp(comando, "SUBSCRIBE_CLASS") == 0) {
                 subscribe_class(client_fd,nome,arg1); 
             } 
-            else if (strcmp(comando, "DISCONNECT") == 0) { //não funciona
-                escrever_ficheiro();
+            else if (strcmp(comando, "DISCONNECT") == 0) { 
+				printf("%s client closing connection!\n", nome);
+				sem_wait(sem_utilizadores); 
+    			for (int i = 0; i < MAX_USERS; i++) {
+        			if (share->users[i].username[0] != '\0' && strcmp(nome, share->users[i].username) == 0) {
+						share->users[i].logged = false;
+					}
+				}
+				sem_post(sem_utilizadores);
+
                 break;
             }
             else if (strcmp(comando, "CREATE_CLASS") == 0 && client_logado == 3) {
                 create_class(client_fd, arg1, arg2, nome);
             }
-            else if (strcmp(comando, "SEND") == 0 && client_logado == 3) { //não funciona
+            else if (strcmp(comando, "SEND") == 0 && client_logado == 3) { 
                 send_cont(client_fd, arg1, arg2, multicast_socket, multicast_addr, nome);
             }
             else {
@@ -409,24 +418,8 @@ void udp_server_function(unsigned short udp_port) {
 					escrever_ficheiro();
 					printf("Servidor UDP encerrando...\n");
 					fflush(stdout);
-
-					kill(p_tcp, SIGTERM);
-                    waitpid(p_tcp, NULL, 0); // Espera o filho terminar
-
-					sem_close(sem_alunos);
-					sem_close(sem_utilizadores);
-					sem_unlink("utilizadores");
-					sem_unlink("alunos");
-
-					if (shmdt(share) == -1) {
-						perror("ERROR IN shmdt");
-					}
-					if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
-						perror("ERROR IN shmctl");
-					}
-					printf("Servidor encerrado.\n");
 					free(file);
-
+					treat_signal();
                     break;
 
 				} 
@@ -450,6 +443,7 @@ void udp_server_function(unsigned short udp_port) {
 
 
 void login_user(const char *username, const char *password, int *login) {
+	sem_wait(sem_utilizadores);
     *login = 0; 
     for (int i = 0; i < MAX_USERS; i++) {
         if (share->users[i].username[0] != '\0' && strcmp(username, share->users[i].username) == 0 && strcmp(password, share->users[i].password) == 0 && (share->users[i].logged == false)) {
@@ -590,10 +584,20 @@ void escrever_ficheiro() {
     fclose(file);
 }
 
-void treat_signal(int sig){
-	close(tcp_fd);
-   	while(wait(NULL)>0);
-	
+void treat_signal(){
+	sem_close(sem_alunos);
+	sem_close(sem_utilizadores);
+	sem_unlink("utilizadores");
+	sem_unlink("alunos");
+
+	if (shmdt(share) == -1) {
+		perror("ERROR IN shmdt");
+	}
+	if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
+		perror("ERROR IN shmctl");
+	}
+	printf("Servidor encerrado.\n");
+
 	exit(0);
 }
 

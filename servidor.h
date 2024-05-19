@@ -85,7 +85,7 @@ void escrever_ficheiro();
 void listar_users(int udp_fd, struct sockaddr_in client_addr, socklen_t addrlen);
 int verifica_func(const char aux[TAM]);
 int verifica_nome(const char aux[TAM]);
-void treat_signal(int sig);
+void treat_signal();
 
 
 #endif 
