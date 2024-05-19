@@ -125,15 +125,16 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
             login_user(arg1, arg2, &client_logado);
 			strcpy(nome,arg1);
             if(client_logado > 1) { //mensagem de ter conseguido logar
+                strcpy(nome,arg1);
                 if (write(client_fd, "OK!\n", strlen("OK!\n")) < 0) perror("Erro ao enviar resposta TCP");
-				if(client_logado == 2 ){//aluno
-					if(write(client_fd, "\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n", strlen("COMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n")) < 0) perror("Erro ao enviar resposta TCP");
-					printf("\nSTUDENT %s HAS LOGGED IN!\n",arg1);
-				}if(client_logado == 3 ){//professor
-					printf("\nTEACHER %s HAS LOGGED IN!\n",arg1);
-					if(write(client_fd, "\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n", strlen("COMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n")) < 0) perror("Erro ao enviar resposta TCP");
-				}
-			}
+                if(client_logado == 2 ){//aluno
+                    if(write(client_fd, "OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n", strlen("OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n")) < 0) perror("Erro ao enviar resposta TCP");
+                    printf("\nSTUDENT %s HAS LOGGED IN!\n",arg1);
+                }if(client_logado == 3 ){//professor
+                    printf("\nTEACHER %s HAS LOGGED IN!\n",arg1);
+                    if(write(client_fd, "OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n", strlen("OK!\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n")) < 0) perror("Erro ao enviar resposta TCP");
+                }
+            }
             else { //mensagem de não ter conseguido logar
 				sem_wait(sem_utilizadores);
 				for (int i = 0; i < MAX_USERS; i++) {
