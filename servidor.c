@@ -2,6 +2,7 @@
 
 
 int main(int argc, char *argv[]) {
+
 	if (argc != 4) {
     printf("server {PORTO_TURMAS} {PORTO_CONFIG} {ficheiro configuração}\n");
     exit(-1);
@@ -22,7 +23,6 @@ int main(int argc, char *argv[]) {
 
 	ler_ficheiro();
 
-	
 
 	p_tcp = fork();
     if (p_tcp == 0) { // Cria um processo filho para o servidor TCP
@@ -49,6 +49,7 @@ int main(int argc, char *argv[]) {
 		int client;
 		client_addr_size = sizeof(tcp_addr);
 
+		signal(SIGINT, treat_signal);
 		while (1) {
 			client = accept(tcp_fd, (struct sockaddr *)&tcp_addr, &client_addr_size);
 			if (client > 0) {
@@ -72,7 +73,6 @@ int main(int argc, char *argv[]) {
 
 
 void process_client(int client_fd, struct sockaddr_in client_addr) {
-	signal(SIGINT, treat_signal);
 	int multicast_socket; //multicast socket
 	struct sockaddr_in multicast_addr;
 	memset(&multicast_addr, 0, sizeof(multicast_addr));
@@ -82,7 +82,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 	if((multicast_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
 		perror("Error creating socket for multicast group");
 
-	int ttl_value = 8; //increase packet life time
+	int ttl_value = 8; 
 	if(setsockopt(multicast_socket, IPPROTO_IP, IP_MULTICAST_TTL, &ttl_value, sizeof(ttl_value)) < 0)
 		perror("Error enabling multicast on socket");
 
@@ -91,6 +91,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
     char request[] = "LOGIN {username} {password}\n"; //mensagem de aviso para fazer o login
     write(client_fd, request, strlen(request));
     int client_logado = 0;
+
     while (1) { //ficamos sempre a ler as mensagens do utilizador e a lidar com elas, até a mensagem recebida ser "SAIR"
         bzero(buffer, BUF_SIZE);
         char comando[TAM];
@@ -122,19 +123,25 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 		}
         if (strcmp(comando, "LOGIN") == 0) {
             login_user(arg1, arg2, &client_logado);
-
+			strcpy(nome,arg1);
             if(client_logado > 1) { //mensagem de ter conseguido logar
-				strcpy(nome,arg1);
                 if (write(client_fd, "OK!\n", strlen("OK!\n")) < 0) perror("Erro ao enviar resposta TCP");
 				if(client_logado == 2 ){//aluno
-					if(write(client_fd, "OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n", strlen("OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n")) < 0) perror("Erro ao enviar resposta TCP");
+					if(write(client_fd, "\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n", strlen("COMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n")) < 0) perror("Erro ao enviar resposta TCP");
 					printf("\nSTUDENT %s HAS LOGGED IN!\n",arg1);
 				}if(client_logado == 3 ){//professor
 					printf("\nTEACHER %s HAS LOGGED IN!\n",arg1);
-					if(write(client_fd, "OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n", strlen("OK!\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n")) < 0) perror("Erro ao enviar resposta TCP");
+					if(write(client_fd, "\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n", strlen("COMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n")) < 0) perror("Erro ao enviar resposta TCP");
 				}
 			}
             else { //mensagem de não ter conseguido logar
+				sem_wait(sem_utilizadores);
+				for (int i = 0; i < MAX_USERS; i++) {
+        			if (strcmp(nome, share->users[i].username) == 0) {
+						share->users[i].logged = false;
+					}
+				}
+				sem_post(sem_utilizadores);
                 if (write(client_fd, "REJECTED!\n", strlen("REJECTED!\n")) < 0) perror("Erro ao enviar resposta TCP");
             }
         } 
@@ -150,6 +157,12 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
             } 
             else if (strcmp(comando, "DISCONNECT") == 0) { 
 				printf("%s client closing connection!\n", nome);
+				sem_wait(sem_utilizadores); 
+    			for (int i = 0; i < MAX_USERS; i++) {
+        			if (share->users[i].username[0] != '\0' && strcmp(nome, share->users[i].username) == 0) {
+						share->users[i].logged = false;
+					}
+				}
 				sem_post(sem_utilizadores);
 				close(client_fd);
 				exit(0);
@@ -441,16 +454,19 @@ void login_user(const char *username, const char *password, int *login) {
 	sem_wait(sem_utilizadores);
     *login = 0; 
     for (int i = 0; i < MAX_USERS; i++) {
-        if (share->users[i].username[0] != '\0' && strcmp(username, share->users[i].username) == 0 && strcmp(password, share->users[i].password) == 0) {
+        if (share->users[i].username[0] != '\0' && strcmp(username, share->users[i].username) == 0 && strcmp(password, share->users[i].password) == 0 && (share->users[i].logged == false)) {
             if (strcmp(share->users[i].role, "administrador") == 0) {
+				share->users[i].logged = true;
                 *login = 1; // Sucesso no login como administrador
 				sem_post(sem_utilizadores);
                 return;
             } else if (strcmp(share->users[i].role, "aluno") == 0) {
+				share->users[i].logged = true;
                 *login = 2; // Sucesso no login como aluno
 				sem_post(sem_utilizadores);
                 return;
             } else if (strcmp(share->users[i].role, "professor") == 0) {
+				share->users[i].logged = true;
                 *login = 3; // Sucesso no login como professor
 				sem_post(sem_utilizadores);
                 return;
@@ -472,6 +488,7 @@ int add_user(const char *name, const char *pass, const char *ro) {  			// admin 
 			strcpy(person.username, name); //Guarda as 3 strings nos seus respetivos lugares na struct
 			strcpy(person.password, pass);
 			strcpy(person.role, ro);
+			person.logged = false;
 			insere_utilizador(person); //Adiciona-se essa struct à lista
 		} else {
 			result=0;
@@ -576,6 +593,8 @@ void escrever_ficheiro() {
 }
 
 void treat_signal(){
+
+	printf("SIGINT received.\n");
 	if (shmdt(share) == -1) {
 		perror("ERROR IN shmdt");
 	}
@@ -589,7 +608,6 @@ void treat_signal(){
 
 	kill(0, SIGKILL);
 
-	printf("\nServidor encerrado.\n");
 	fflush(stdout);
 	exit(0);
 }
@@ -626,6 +644,7 @@ void init_shared_struct(shared *share) {
         memset(share->users[i].username, 0, TAM);
         memset(share->users[i].password, 0, TAM);
         memset(share->users[i].role, 0, TAM);
+		share->users[i].logged = false;
     }
 
     // Inicializar todas as classes
