@@ -167,7 +167,7 @@ void* listen_class(void* arg){
         }
 
         buf[n] = '\0';
-        printf("Received message from class: \n %s", buf);
+        printf("Received message from class: \n %s \n", buf);
         fflush(stdout);
     }
 

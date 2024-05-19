@@ -239,7 +239,7 @@ int subscribe_class(int client_fd,const char *username, const char *class_name){
                 }
             }
             // Tentar adicionar o utilizador à turma
-            for (int j = 0; j < MAX_USERS_CLASS; j++) {
+            for (int j = 0; j < share->aulas[i].max_alunos; j++) {
                 if (share->aulas[i].alunos_turma[j].username[0] == '\0') {  // Encontrar espaço vazio
                     strncpy(share->aulas[i].alunos_turma[j].username, username, TAM);
 					sem_post(sem_alunos);
