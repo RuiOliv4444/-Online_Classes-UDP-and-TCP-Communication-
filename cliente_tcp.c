@@ -33,95 +33,95 @@ char groups[MAX_CLASSES_PER_USER][16];
 
 
 int main(int argc, char *argv[]) {
-  char endServer[100];
-  struct sockaddr_in addr;
-  struct hostent *hostPtr;
-  char buffer[1024];
-  char mensagem[1024];
+	char endServer[100];
+	struct sockaddr_in addr;
+	struct hostent *hostPtr;
+	char buffer[1024];
+	char mensagem[1024];
 
-  if (argc != 3) {
-    printf("cliente {endereço do servidor} {PORTO_TURMAS} \n");
-    exit(-1);
-  }
+	if (argc != 3) {
+		printf("cliente {endereço do servidor} {PORTO_TURMAS} \n");
+		exit(-1);
+	}
 
 	struct sigaction sa;
-    sa.sa_handler = sigint_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGINT, &sa, NULL);
+	sa.sa_handler = sigint_handler;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	sigaction(SIGINT, &sa, NULL);
 
-  strcpy(endServer, argv[1]); 
+	strcpy(endServer, argv[1]); 
 
-  if ((hostPtr = gethostbyname(endServer)) == 0)						
-    erro("Não consegui obter endereço");
+	if ((hostPtr = gethostbyname(endServer)) == 0)						
+	erro("Não consegui obter endereço");
 
-  bzero((void *) &addr, sizeof(addr));									
-  addr.sin_family = AF_INET; 											
-  addr.sin_addr.s_addr = ((struct in_addr *)(hostPtr->h_addr))->s_addr; 
-  addr.sin_port = htons((short) atoi(argv[2]));							
+	bzero((void *) &addr, sizeof(addr));									
+	addr.sin_family = AF_INET; 											
+	addr.sin_addr.s_addr = ((struct in_addr *)(hostPtr->h_addr))->s_addr; 
+	addr.sin_port = htons((short) atoi(argv[2]));							
 
-  if ((fd = socket(AF_INET,SOCK_STREAM,0)) == -1)						
-    erro("Erro no socket");
-  if (connect(fd,(struct sockaddr *)&addr,sizeof (addr)) < 0)			
-    erro("Connectado");
+	if ((fd = socket(AF_INET,SOCK_STREAM,0)) == -1)						
+		erro("Erro no socket");
+	if (connect(fd,(struct sockaddr *)&addr,sizeof (addr)) < 0)			
+		erro("Connectado");
 
 	int i = 0;
-  while (1) { //ciclo infinito para estar sempre a ler e a responder ás mensagens do servidor até ordem contrária
-    bzero(buffer, 1024);
-    int bytes_read = read(fd, buffer, 1023);// ler a mensagem eviado pelo server, que pode ser a de boas vindas, informação sobre o dominio, ou mensagem de despedida
-    if (bytes_read <= 0) break;
-	if(i==1){
-		char *resultado = strstr(buffer, "ACCEPTED");
-		if (resultado != NULL) {
-			char endereco[50];  // Array para armazenar o endereço extraído
+	while (1) { //ciclo infinito para estar sempre a ler e a responder ás mensagens do servidor até ordem contrária
+		bzero(buffer, 1024);
+		int bytes_read = read(fd, buffer, 1023);// ler a mensagem eviado pelo server, que pode ser a de boas vindas, informação sobre o dominio, ou mensagem de despedida
+		if (bytes_read <= 0) break;
+			if(i==1){
+				char *resultado = strstr(buffer, "ACCEPTED");
+				if (resultado != NULL) {
+					char endereco[50];  // Array para armazenar o endereço extraído
 
-			// Usando sscanf para extrair o endereço dentro dos sinais de menor e maior
-			if (sscanf(buffer, "ACCEPTED <%49[^>]>%*s", endereco) == 1) {
-				endereco[strlen(endereco)]= '\0';
-				printf("GOING TO JOIN MULTICAST\n");
-				printf("ENDEREÇO: %s\n",endereco);
-				join_class(endereco);
-			}
+					// Usando sscanf para extrair o endereço dentro dos sinais de menor e maior
+					if (sscanf(buffer, "ACCEPTED <%49[^>]>%*s", endereco) == 1) {
+						endereco[strlen(endereco)]= '\0';
+						printf("GOING TO JOIN MULTICAST\n");
+						printf("ENDEREÇO: %s\n",endereco);
+						join_class(endereco);
+					}
+				}
+		}
+
+		printf("%s\n", buffer);
+
+		fgets(mensagem, 1024, stdin);  //guardar na variavel "mensagem" a mensagem do cliente
+
+		mensagem[strcspn(mensagem, "\n")] = 0; 
+		write(fd, mensagem, strlen(mensagem));
+		if (strcmp(mensagem, "DISCONNECT") == 0) {//verificar se o server enviou a mensagem de despedida, se sim, temos de encerrar o programa
+			sigint_handler();
+			break;
+		}
+		char *resultado = strstr(mensagem, "SUBSCRIBE_CLASS");
+		if (resultado != NULL) {
+			i=1;
+		} else {
+			i=0;
 		}
 	}
 
-    printf("%s\n", buffer);
-	
-    fgets(mensagem, 1024, stdin);  //guardar na variavel "mensagem" a mensagem do cliente
-
-    mensagem[strcspn(mensagem, "\n")] = 0; 
-    write(fd, mensagem, strlen(mensagem));
-	if (strncmp(mensagem, "DISCONNECT\n", 11) == 0) {//verificar se o server enviou a mensagem de despedida, se sim, temos de encerrar o programa
-		close_con();
-        break;
-    }
-	char *resultado = strstr(mensagem, "SUBSCRIBE_CLASS");
-    if (resultado != NULL) {
-		i=1;
-    } else {
-		i=0;
-    }
-  }
-
-  close(fd); //fechar o socket
-  exit(0);
+	close(fd); //fechar o socket
+	exit(0);
 }
 
 void join_class(char multicast[]){
 	struct sockaddr_in addr;
     struct ip_mreq mreq;
 
-    //create socket
+    //cria socket
     if ((sockets[classe] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("Erro no socket");
         exit(1);
     }
 
-    //reuse port
+    //reutiliza a porta
     int opt = 1;
     setsockopt(sockets[classe], SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    //bind to all local interfaces
+    //bind todas as interfaces locais
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -167,7 +167,7 @@ void* listen_class(void* arg){
         }
 
         buf[n] = '\0';
-        printf("Received message from class: \n->%s", buf);
+        printf("Received message from class: \n %s", buf);
         fflush(stdout);
     }
 
@@ -176,8 +176,8 @@ void* listen_class(void* arg){
 
 
 void erro(char *msg) {
-  printf("Erro: %s\n", msg);
-  exit(-1);
+	printf("Erro: %s\n", msg);
+	exit(-1);
 }
 
 void sigint_handler(){
