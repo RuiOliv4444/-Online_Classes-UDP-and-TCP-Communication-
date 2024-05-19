@@ -137,6 +137,15 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 			}
             else { //mensagem de não ter conseguido logar
                 if (write(client_fd, "REJECTED!\n", strlen("REJECTED!\n")) < 0) perror("Erro ao enviar resposta TCP");
+				sem_wait(sem_utilizadores); 
+    			for (int i = 0; i < MAX_USERS; i++) {
+        			if (share->users[i].username[0] != '\0' && strcmp(nome, share->users[i].username) == 0) {
+						share->users[i].logged = false;
+					}
+				}
+				sem_post(sem_utilizadores);
+				
+
             }
         } 
         else if (client_logado > 1) { // O admin para ter acesso a esta parte vai ter de se logar primeiro
