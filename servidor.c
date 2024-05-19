@@ -4,8 +4,8 @@
 int main(int argc, char *argv[]) {
 
 	if (argc != 4) {
-    printf("server {PORTO_TURMAS} {PORTO_CONFIG} {ficheiro configuração}\n");
-    exit(-1);
+		printf("server {PORTO_TURMAS} {PORTO_CONFIG} {ficheiro configuração}\n");
+		exit(-1);
 	}
 	sem_unlink("utilizadores");
 	sem_unlink("alunos");
@@ -124,24 +124,17 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
         if (strcmp(comando, "LOGIN") == 0) {
             login_user(arg1, arg2, &client_logado);
 			strcpy(nome,arg1);
+
             if(client_logado > 1) { //mensagem de ter conseguido logar
-                strcpy(nome,arg1);
                 if(client_logado == 2 ){//aluno
+					printf("\nSTUDENT %s HAS LOGGED IN!\n",nome);
                     if(write(client_fd, "OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n", strlen("OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n")) < 0) perror("Erro ao enviar resposta TCP");
-                    printf("\nSTUDENT %s HAS LOGGED IN!\n",arg1);
                 }if(client_logado == 3 ){//professor
-                    printf("\nTEACHER %s HAS LOGGED IN!\n",arg1);
+                    printf("\nTEACHER %s HAS LOGGED IN!\n",nome);
                     if(write(client_fd, "OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n", strlen("OK!\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n-> CREATE_CLASS <name> <size>\n-> SEND <name> <text>\n")) < 0) perror("Erro ao enviar resposta TCP");
                 }
             }
             else { //mensagem de não ter conseguido logar
-				sem_wait(sem_utilizadores);
-				for (int i = 0; i < MAX_USERS; i++) {
-        			if (strcmp(nome, share->users[i].username) == 0) {
-						share->users[i].logged = false;
-					}
-				}
-				sem_post(sem_utilizadores);
                 if (write(client_fd, "REJECTED!\n", strlen("REJECTED!\n")) < 0) perror("Erro ao enviar resposta TCP");
             }
         } 

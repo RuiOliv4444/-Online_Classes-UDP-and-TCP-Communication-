@@ -92,8 +92,8 @@ int main(int argc, char *argv[]) {
 		mensagem[strcspn(mensagem, "\n")] = 0; 
 		write(fd, mensagem, strlen(mensagem));
 		if (strcmp(mensagem, "DISCONNECT") == 0) {//verificar se o server enviou a mensagem de despedida, se sim, temos de encerrar o programa
+			printf("CLOSING\n");
 			sigint_handler();
-			break;
 		}
 		char *resultado = strstr(mensagem, "SUBSCRIBE_CLASS");
 		if (resultado != NULL) {
@@ -181,8 +181,6 @@ void erro(char *msg) {
 }
 
 void sigint_handler(){
-    write(fd, "CLOSING", strlen("CLOSING"));
-    printf("SIGINT received. Closing multicast sockets...\n");
     close_con();
     exit(0);
 }
