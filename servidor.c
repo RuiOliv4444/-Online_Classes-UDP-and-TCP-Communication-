@@ -1,5 +1,6 @@
 #include "servidor.h"
 
+
 int main(int argc, char *argv[]) {
 	if (argc != 4) {
     printf("server {PORTO_TURMAS} {PORTO_CONFIG} {ficheiro configuração}\n");
@@ -156,8 +157,8 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 					}
 				}
 				sem_post(sem_utilizadores);
-
-                break;
+				close(client_fd);
+				exit(0);
             }
             else if (strcmp(comando, "CREATE_CLASS") == 0 && client_logado == 3) {
                 create_class(client_fd, arg1, arg2, nome);
@@ -418,7 +419,7 @@ void udp_server_function(unsigned short udp_port) {
 					escrever_ficheiro();
 					printf("Servidor UDP encerrando...\n");
 					fflush(stdout);
-					free(file);
+					close(udp_fd);
 					treat_signal();
                     break;
 
@@ -585,19 +586,21 @@ void escrever_ficheiro() {
 }
 
 void treat_signal(){
-	sem_close(sem_alunos);
-	sem_close(sem_utilizadores);
-	sem_unlink("utilizadores");
-	sem_unlink("alunos");
-
 	if (shmdt(share) == -1) {
 		perror("ERROR IN shmdt");
 	}
 	if (shmctl(shm_id, IPC_RMID, NULL) == -1) {
 		perror("ERROR IN shmctl");
 	}
-	printf("Servidor encerrado.\n");
+	sem_close(sem_alunos);
+	sem_close(sem_utilizadores);
+	sem_unlink("utilizadores");
+	sem_unlink("alunos");
 
+	kill(0, SIGKILL);
+
+	printf("\nServidor encerrado.\n");
+	fflush(stdout);
 	exit(0);
 }
 
@@ -611,14 +614,15 @@ void erro(char *msg) {
 void create_shared() {
     int shm_size = sizeof(shared);  // Como 'shared' agora contém tudo, não precisamos adicionar mais nada.
 
-    if ((shm_id = shmget(IPC_PRIVATE, shm_size, IPC_CREAT | IPC_EXCL | 0700)) < 0) {
-        printf("ERROR IN SHMGET\n");
+    shm_id = shmget(IPC_PRIVATE, shm_size, IPC_CREAT | IPC_EXCL | 0700);
+    if (shm_id < 0) {
+        perror("ERROR IN SHMGET");
         exit(1);
     }
 
     share = (shared *)shmat(shm_id, NULL, 0);
     if (share == (void *)-1) {
-        printf("ERROR IN SHMAT");
+        perror("ERROR IN SHMAT");
         exit(1);
     }
 
