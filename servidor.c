@@ -126,7 +126,6 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 			strcpy(nome,arg1);
             if(client_logado > 1) { //mensagem de ter conseguido logar
                 strcpy(nome,arg1);
-                if (write(client_fd, "OK!\n", strlen("OK!\n")) < 0) perror("Erro ao enviar resposta TCP");
                 if(client_logado == 2 ){//aluno
                     if(write(client_fd, "OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n", strlen("OK!\n\nCOMMANDS:\n-> LIST_CLASSES\n-> LIST_SUBSCRIBED\n-> SUBSCRIBE_CLASS <name>\n")) < 0) perror("Erro ao enviar resposta TCP");
                     printf("\nSTUDENT %s HAS LOGGED IN!\n",arg1);
