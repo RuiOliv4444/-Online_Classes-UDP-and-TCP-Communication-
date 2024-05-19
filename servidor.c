@@ -2,6 +2,7 @@
 
 
 int main(int argc, char *argv[]) {
+
 	if (argc != 4) {
     printf("server {PORTO_TURMAS} {PORTO_CONFIG} {ficheiro configuração}\n");
     exit(-1);
@@ -22,7 +23,6 @@ int main(int argc, char *argv[]) {
 
 	ler_ficheiro();
 
-	
 
 	p_tcp = fork();
     if (p_tcp == 0) { // Cria um processo filho para o servidor TCP
@@ -49,6 +49,7 @@ int main(int argc, char *argv[]) {
 		int client;
 		client_addr_size = sizeof(tcp_addr);
 
+		signal(SIGINT, treat_signal);
 		while (1) {
 			client = accept(tcp_fd, (struct sockaddr *)&tcp_addr, &client_addr_size);
 			if (client > 0) {
@@ -72,7 +73,6 @@ int main(int argc, char *argv[]) {
 
 
 void process_client(int client_fd, struct sockaddr_in client_addr) {
-	signal(SIGINT, treat_signal);
 	int multicast_socket; //multicast socket
 	struct sockaddr_in multicast_addr;
 	memset(&multicast_addr, 0, sizeof(multicast_addr));
@@ -82,7 +82,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
 	if((multicast_socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
 		perror("Error creating socket for multicast group");
 
-	int ttl_value = 8; //increase packet life time
+	int ttl_value = 8; 
 	if(setsockopt(multicast_socket, IPPROTO_IP, IP_MULTICAST_TTL, &ttl_value, sizeof(ttl_value)) < 0)
 		perror("Error enabling multicast on socket");
 
@@ -91,6 +91,7 @@ void process_client(int client_fd, struct sockaddr_in client_addr) {
     char request[] = "LOGIN {username} {password}\n"; //mensagem de aviso para fazer o login
     write(client_fd, request, strlen(request));
     int client_logado = 0;
+
     while (1) { //ficamos sempre a ler as mensagens do utilizador e a lidar com elas, até a mensagem recebida ser "SAIR"
         bzero(buffer, BUF_SIZE);
         char comando[TAM];
@@ -586,6 +587,8 @@ void escrever_ficheiro() {
 }
 
 void treat_signal(){
+
+	printf("SIGINT received.\n");
 	if (shmdt(share) == -1) {
 		perror("ERROR IN shmdt");
 	}
@@ -599,7 +602,6 @@ void treat_signal(){
 
 	kill(0, SIGKILL);
 
-	printf("\nServidor encerrado.\n");
 	fflush(stdout);
 	exit(0);
 }
