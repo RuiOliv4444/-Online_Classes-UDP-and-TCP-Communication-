@@ -1,6 +1,19 @@
-Project for the discipline "Redes de Comunicação".
+To execute the UDP connection:
 
+server´s terminal:
+gcc servidor.c -o server 
+./server 12345 12348 utilizadores.txt
 
-The objective of this project is to implement an online class system for disseminating content,
-using various communication techniques and using protocols from the TCP/IP stack. 
-In particular, we will make use of the UDP and TCP protocols, as well as IP multicast communications.
+other terminal:
+nc -v -u 127.0.0.1 12348
+
+To execute the TCP connection: 
+
+server´s terminal:
+gcc servidor.c -o server 
+./server 12345 12348 utilizadores.txt
+
+client´s terminal:
+
+gcc cliente_tcp.c -o client
+./client 127.0.0.1 12345
